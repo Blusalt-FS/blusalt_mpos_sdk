@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- added by Luna -->
+    <!-- Green -->
+
+    <!--自定义键盘颜色-->
+    <color name="keyboard_back_color">#E5E5E5</color>
+    <color name="keyboard_text_color">#333333</color>
+    <color name="keyboard_white_color">#FFFFFF</color>
+
+    <color name="purple_200">#FFFFFF</color>
+    <color name="purple_500">#DBDBDB</color>
+    <color name="purple_700">#DBDBDB</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="dark_gray">#A4A4A4</color>
+    <color name="light_grey">#e3e3e3</color>
+    <color name="overlayColor">#7EFFEDED</color>
+    <color name="spin_color">#E4E1E1</color>
+
+    <!-- Blue -->
+    <color name="eb_col_14">#00A1DE</color>
+    <color name="eb_col_4">#004C90</color>
+
+    <!-- Gray -->
+    <color name="eb_col_7">#ffffff</color>
+    <color name="eb_col_12">#f8f8f8</color>
+    <color name="eb_col_11">#555555</color>
+    <color name="eb_col_34">#000000</color>
+
+    <!-- Other -->
+
+
+    <!--     new branding added -->
+    <color name="action_bar">@color/eb_col_4</color>
+
+    <!-- drawer menu -->
+    <color name="segment_line">@color/eb_col_12</color>
+
+    <!-- email campaign color -->
+
+    <!--嫩粉-->
+    <!--炭黑-->
+    <!--牙灰-->
+    <!--深绿-->
+
+    <!--transparent color-->
+    <color name="eb_col_30">#fafafa</color>
+    <!--custom color-->
+    <color name="custom_light_color">#ffffff</color>
+    <color name="custom_middle_color">#d3d4d4</color>
+    <color name="custom_dark_color">#000000</color>
+
+    <!--campaign pie chart color-->
+
+    <!--check in point-->
+
+    <!--transparent colors-->
+
+
+</resources>

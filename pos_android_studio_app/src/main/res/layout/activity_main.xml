@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+<!--    <include -->
+<!--        layout="@layout/toolbar_layout" />-->
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/parentScrollview"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/img_anim_scanbt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/lv_indicator_BTPOS"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:cacheColorHint="@android:color/transparent"
+                    android:divider="#FFA0A0A0"
+                    android:dividerHeight="1dp"
+                    android:listSelector="#00FFFFFF"
+                    android:paddingLeft="10dp"
+                    android:paddingRight="10dp"
+                    android:scrollbars="none"
+                    android:visibility="gone" />
+
+            </RelativeLayout>
+
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnBT"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/please_select_bt_name" />
+
+                <!--            android:text="@string/check_card"-->
+                <Button
+                    android:id="@+id/doTradeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/check_card" />
+
+                <Button
+                    android:id="@+id/disconnect"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:enabled="false"
+                    android:text="@string/disconnect" />
+
+                <Button
+                    android:id="@+id/btnUSB"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/scan_usb_device" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/updateFW"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="update"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnQuickEMV"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/text_quick_emv"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/ll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:orientation="vertical">
+
+
+                <EditText
+                    android:id="@+id/keyindex"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="5dip"
+                    android:layout_marginRight="5dip"
+                    android:gravity="center"
+                    android:hint="key index" />
+
+                <EditText
+                    android:id="@+id/statusEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="5dip"
+                    android:layout_marginRight="5dip"
+                    android:inputType="none" />
+
+                <EditText
+                    android:id="@+id/chipStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="5dip"
+                    android:layout_marginRight="5dip"
+                    android:hint="chip data" />
+
+
+            </LinearLayout>
+
+            <include
+                layout="@layout/view_mifare"
+                android:visibility="visible" />
+
+            <include layout="@layout/layout_key_injection_remotely" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"/>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="250dp">
+
+        <pl.droidsonroids.gif.GifImageView
+            android:id="@+id/imageView"
+            android:layout_width="match_parent"
+            android:scaleType="centerInside"
+            android:layout_margin="20dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical"
+            />
+    </FrameLayout>
+
+    <TextView
+        android:padding="@dimen/fab_margin"
+        android:id="@+id/pos_view_update"
+        android:textSize="18sp"
+        android:textColor="@color/white"
+        android:fontFamily="@font/proxima_nova_bold"
+        android:gravity="center_horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/emv_text"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="12dp"
+        android:layout_weight="8"
+        android:visibility="gone"
+        android:fontFamily="@font/proxima_nova_bold"
+        />
+
+</LinearLayout>
