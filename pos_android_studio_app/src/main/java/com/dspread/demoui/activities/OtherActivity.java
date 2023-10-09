@@ -1015,7 +1015,7 @@ public class OtherActivity extends BaseActivity {
                 statusEditText.setText(content);
             } else {
                 isVisiblePosID = false;
-                BaseApplication.setmPosID(posId);
+//                BaseApplication.setmPosID(posId);
             }
         }
 

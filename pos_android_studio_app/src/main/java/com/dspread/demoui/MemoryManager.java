@@ -21,14 +21,13 @@ public class MemoryManager {
     private static final String KEY_KEEP_STATE = "keep_state";
 
 
-    private MemoryManager() {
-        mSharedPreferences = BaseApplication.getINSTANCE().getApplicationContext()
-                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+    private MemoryManager(Context context) {
+        mSharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         editor = mSharedPreferences.edit();
     }
 
-    public static synchronized MemoryManager getInstance() {
-        if (sInstance == null) sInstance = new MemoryManager();
+    public static synchronized MemoryManager getInstance(Context context) {
+        if (sInstance == null) sInstance = new MemoryManager(context);
         return sInstance;
     }
 

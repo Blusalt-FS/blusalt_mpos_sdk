@@ -10,20 +10,44 @@
         android:id="@+id/textview_first"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/hello_first_fragment"
-        app:layout_constraintBottom_toTopOf="@id/button_first"
+        android:text="Enter Details"
+        android:layout_marginTop="200dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <EditText
+        android:id="@+id/editview_mac"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Enter Bluetooth Mac - 98:27:82:4C:6D:42"
+        android:text="98:27:82:4C:6D:42"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textview_first" />
+
+
+<!--    04:D1:6E:54:1F:55-->
+<!--    MPOS9112000755 -->
+    <EditText
+        android:id="@+id/editview_tittle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Enter Bluetooth Tittle - MPOS2111050246"
+        android:text="MPOS2111050246"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editview_mac" />
 
     <Button
         android:id="@+id/button_first"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/next"
+        android:backgroundTint="@color/black"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/textview_first" />
+        app:layout_constraintTop_toBottomOf="@id/editview_tittle" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -55,10 +55,10 @@ public class BaseApplication extends Application {
         //  Default init
         XCrash.init(this);
         OkGo.getInstance().init(this);
-        initXHttp();
-
-        initOKHttpUtils();
-        initAppUpDate();
+//        initXHttp();
+//
+//        initOKHttpUtils();
+//        initAppUpDate();
     }
 
 

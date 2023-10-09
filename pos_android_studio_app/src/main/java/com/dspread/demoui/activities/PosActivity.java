@@ -275,7 +275,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     }
 
     private Boolean isSecretKeyAdded() {
-        return MemoryManager.getInstance().isSecretActivated();
+        return MemoryManager.getInstance(getApplicationContext()).isSecretActivated();
     }
 
     public void bluetoothRelaPer() {
@@ -1298,7 +1298,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
             } else {
                 isVisiblePosID = false;
-                BaseApplication.setmPosID(posId);
+//                BaseApplication.setmPosID(posId);
                 TRACE.w("onQposIdResult() posId :" + posId);
             }
             isPinCanceled = false;
@@ -2667,10 +2667,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         onCompleteTransaction(response);
     }
 
-    public static void init(String secretKey) {
+    public static void init(String secretKey, Context context) {
         if (!TextUtils.isEmpty(secretKey)) {
             try {
-                MemoryManager.getInstance().putUserSecretKey(secretKey);
+                MemoryManager.getInstance(context).putUserSecretKey(secretKey);
             } catch (Exception e) {
                 AppLog.e("prepareForPrinter", e.getMessage());
             }
