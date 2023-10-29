@@ -8,6 +8,7 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.dspread.demoui.activities.OtherActivity
 import com.dspread.demoui.activities.PosActivity
 import com.dspread.demoui.blusaltmpos.pay.TerminalResponse
 import com.dspread.demoui.blusaltmpos.util.Constants
@@ -41,7 +42,7 @@ class MainActivity : AppCompatActivity() {
             } else if (tittle?.getText().toString().isEmpty()) {
                 Toast.makeText(applicationContext, "Input TITTLE", Toast.LENGTH_SHORT).show()
             } else {
-                startAccountSelectionActivity(3500.0);
+                startAccountSelectionActivity(38.0);
             }
 //            val bluSaltPrinter = BluSaltPrinter()
 //            bluSaltPrinter.printerType = PrinterType.PosTransaction
@@ -70,12 +71,16 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun startAccountSelectionActivity(amount: Double) {
-        val intent = Intent(this, PosActivity::class.java)
+        val intent = Intent(this, OtherActivity::class.java)
         intent.putExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE, "10")
         intent.putExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, amount)
         intent.putExtra(Constants.TERMINAL_ID, "2076NA61")
         intent.putExtra(Constants.BLUETOOTH_ADDRESS, mac?.getText().toString())
         intent.putExtra(Constants.BLUETOOTH_TITTLE, tittle?.getText().toString())
+//        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:16") //seyi 151
+//        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140151")
+//        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:17") //seyi 152
+//        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140152")
 //        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "98:27:82:4C:6D:42") //seyi
 //        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2111050246")
         startActivityForResult(intent, 100)

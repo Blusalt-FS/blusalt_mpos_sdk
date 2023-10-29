@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="fill_parent"
-              android:layout_height="fill_parent"
-              android:fadingEdge="none"
-              android:orientation="vertical">
-    <include layout="@layout/toolbar_layout"/>
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:fadingEdge="none"
+    android:orientation="vertical">
+    <!--    <include layout="@layout/toolbar_layout"/>-->
     <ScrollView
         android:id="@+id/parentScrollview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:visibility="gone">
 
         <LinearLayout
             android:id="@+id/lin"
@@ -27,24 +28,23 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:visibility="gone"
-                    android:text="@string/open_audio"/>
+                    android:text="@string/open_audio"
+                    android:visibility="gone" />
 
                 <Button
                     android:id="@+id/serialPort"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:visibility="gone"
-                    android:text="@string/open_serial_port"/>
+                    android:text="@string/open_serial_port"
+                    android:visibility="gone" />
 
-                <Button
-                    android:id="@+id/doTradeButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:enabled="false"
-                    android:text="@string/check_card"/>
+<!--                <Button-->
+<!--                    android:id="@+id/doTradeButton"-->
+<!--                    android:layout_width="0dp"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_weight="1"-->
+<!--                    android:text="Continue" />-->
 
                 <Button
                     android:id="@+id/disconnect"
@@ -52,14 +52,14 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:enabled="false"
-                    android:text="@string/disconnect"/>
+                    android:text="@string/disconnect" />
 
                 <Button
                     android:id="@+id/btnUSB"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/scan_usb_device"/>
+                    android:text="@string/scan_usb_device" />
             </LinearLayout>
 
 
@@ -73,8 +73,6 @@
                 android:focusableInTouchMode="true"
                 android:orientation="vertical">
 
-
-
                 <EditText
                     android:id="@+id/keyindex"
                     android:layout_width="fill_parent"
@@ -82,7 +80,7 @@
                     android:layout_marginLeft="5dip"
                     android:layout_marginRight="5dip"
                     android:gravity="center"
-                    android:hint="key index"/>
+                    android:hint="key index" />
 
 
                 <EditText
@@ -91,7 +89,7 @@
                     android:layout_height="fill_parent"
                     android:layout_marginLeft="5dip"
                     android:layout_marginRight="5dip"
-                    android:editable="false"/>
+                    android:editable="false" />
 
                 <EditText
                     android:id="@+id/chipStatus"
@@ -99,13 +97,62 @@
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="5dip"
                     android:layout_marginRight="5dip"
-                    android:hint="chip data"/>
+                    android:hint="chip data" />
 
             </LinearLayout>
 
-            <include android:visibility="visible"
-                layout="@layout/view_mifare"/>
+            <include
+                layout="@layout/view_mifare"
+                android:visibility="visible" />
 
         </LinearLayout>
     </ScrollView>
+
+
+    <FrameLayout
+        android:id="@+id/imageViewframe"
+        android:layout_width="match_parent"
+        android:layout_height="250dp">
+
+        <pl.droidsonroids.gif.GifImageView
+            android:id="@+id/imageViewGif"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical"
+            android:layout_margin="20dp"
+            android:scaleType="centerInside" />
+    </FrameLayout>
+
+    <TextView
+        android:visibility="gone"
+        android:id="@+id/pos_view_update"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/proxima_nova_bold"
+        android:gravity="center_horizontal"
+        android:padding="@dimen/fab_margin"
+        android:text=""
+        android:textColor="@color/black"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/doTradeButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:backgroundTint="#509FEF"
+        android:padding="@dimen/dp_10"
+        android:layout_marginEnd="@dimen/dp_16"
+        android:layout_marginStart="@dimen/dp_16"
+        android:text="Connect USB to mpos" />
+
+    <TextView
+        android:id="@+id/emv_text"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="12dp"
+        android:layout_weight="8"
+        android:fontFamily="@font/proxima_nova_bold"
+        android:visibility="gone" />
 </LinearLayout>

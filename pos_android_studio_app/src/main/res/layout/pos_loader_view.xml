@@ -25,12 +25,12 @@
     <TextView
         android:padding="@dimen/fab_margin"
         android:id="@+id/pos_view_update"
-        android:textSize="18sp"
-        android:textColor="@color/white"
+        android:text=""
+        android:textSize="24sp"
+        android:textColor="@color/black"
         android:fontFamily="@font/proxima_nova_bold"
         android:gravity="center_horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
-
 
 </LinearLayout>

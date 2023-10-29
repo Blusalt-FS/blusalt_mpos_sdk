@@ -36,7 +36,10 @@ public class RetrofitClientInstance {
         interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
 
 //        authorization = MemoryManager.getInstance().getSecretKey() != null ? MemoryManager.getInstance().getSecretKey(): "";
-        authorization = "test_8c3f614d42530912fbb5a76b72626f8861410cee382948c0e14090ea6f749798db8fd109bed75759129165a2037f6a371691150896997sk";
+//        authorization = "test_8c3f614d42530912fbb5a76b72626f8861410cee382948c0e14090ea6f749798db8fd109bed75759129165a2037f6a371691150896997sk";
+//        authorization = "test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk";
+        authorization = "test_a270061ca6990a0150f10358a450182605c0b7c97f26f317303face08a459fa7e8888239369df65f7776929aeecc4b651696418879912sk";
+
         Log.d("AAA",authorization);
         String authValue = authorization;
         Interceptor authInterceptor = chain -> {

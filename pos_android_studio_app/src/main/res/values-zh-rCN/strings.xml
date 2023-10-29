@@ -59,7 +59,7 @@
     <string name="open_audio">打开音频</string>
     <string name="scan_bt_pos_error">没有绑定的设备\n请先绑定</string>
     <string name="connecting_bt_pos">连接设备中\n请稍等…</string>
-    <string name="app_name">pos-android-demo</string>
+    <string name="app_name">Mpos</string>
     <string name="action_settings" >Settings</string>
     <string name="waiting_for_card">请拍卡或刷卡或插入ICC卡</string>
     <string name="no_card_detected">刷卡或插卡已超时\n请按开始再试一次</string>

@@ -2,7 +2,7 @@
 <resources>
 
 
-    <style name="AppBaseTheme" parent="@android:style/Theme.Holo.Light">
+    <style name="AppBaseTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="android:actionBarStyle">@style/MyActionBar</item>
     </style>
 

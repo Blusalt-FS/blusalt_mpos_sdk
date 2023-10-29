@@ -33,6 +33,8 @@
 
     <!-- Other -->
 
+    <color name="toolbar_color">#FFFFFF</color>
+    <color name="background_btn">#509FEF</color>
 
     <!--     new branding added -->
     <color name="action_bar">@color/eb_col_4</color>

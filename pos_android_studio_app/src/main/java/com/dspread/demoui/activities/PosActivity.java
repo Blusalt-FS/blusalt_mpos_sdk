@@ -52,6 +52,7 @@ import com.dspread.demoui.blusaltmpos.pay.TerminalInfo;
 import com.dspread.demoui.blusaltmpos.pay.TerminalResponse;
 import com.dspread.demoui.blusaltmpos.pos.AppLog;
 import com.dspread.demoui.blusaltmpos.pos.TlvDataList;
+import com.dspread.demoui.blusaltmpos.util.AppPreferenceHelper;
 import com.dspread.demoui.blusaltmpos.util.Constants;
 import com.dspread.demoui.blusaltmpos.util.KSNUtilities;
 import com.dspread.demoui.blusaltmpos.util.StringUtils;
@@ -125,6 +126,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     private Spinner cmdSp;
     private RecyclerView m_ListView;
     private EditText statusEditText, blockAdd, status, status11, block_address11;
+    private TextView pos_view_update;
+    private EditText pinEditText;
     private EditText mhipStatus;
     private BluetoothAdapter m_Adapter = null;
     private ImageView imvAnimScan;
@@ -180,6 +183,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     private String accountType;
     private GifImageView spinKit;
 
+    private AppPreferenceHelper appPreferenceHelper;
+
 //    @Override
 //    public void onGuideListener(Button button) {
 //        switch (button.getId()) {
@@ -228,6 +233,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         setContentView(R.layout.pos_loader_view);
 
         bluetoothRelaPer();
+        appPreferenceHelper = new AppPreferenceHelper(this);
 
 //        totalAmount = 5.00;
 //        blueTootchAddress = "98:27:82:4C:6D:42";
@@ -245,7 +251,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                totalAmount = 5.00;
 //                blueTootchAddress = "98:27:82:4C:6D:42";
 //                blueTitle = "MPOS2111050246";
-
+                Log.e("TAG Amount", String.valueOf(totalAmount));
+                Log.e("TAG Amount", Long.toString(totalAmount.longValue()));
                 totalAmountPrint = totalAmount;
                 if (!TextUtils.isEmpty(intent.getStringExtra(Constants.TERMINAL_ID))
                         && !TextUtils.isEmpty(String.valueOf(intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0)))
@@ -271,6 +278,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         initView();
         initIntent();
 //        initListener();
+
         proceedToPayment();
     }
 
@@ -433,6 +441,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //        parentScrollView.smoothScrollTo(0, 0);
         m_ListView = (RecyclerView) findViewById(R.id.lv_indicator_BTPOS);
         mKeyIndex = ((EditText) findViewById(R.id.keyindex));
+
+        pos_view_update = ((TextView) findViewById(R.id.pos_view_update));
 //        btnBT.post(new Runnable() {
 //            @Override
 //            public void run() {
@@ -511,6 +521,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
             start_time = new Date().getTime();
             sendMsg(1001);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -518,7 +529,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         if (pos == null) {
             Log.e("TAG", "pos null");
             FailedTransaction();
-            statusEditText.setText(R.string.scan_bt_pos_error);
+            Log.e("Log TAG", String.valueOf(R.string.scan_bt_pos_error));
             return;
         }
 
@@ -547,18 +558,20 @@ public class PosActivity extends BaseActivity implements TransactionListener {
      */
     private void open(CommunicationMode mode) {
         TRACE.d("open");
-        Log.e("TAG", "okay");
+        Log.e("TAG open", "okay");
         //pos=null;
 //        MyPosListener listener = new MyPosListener();
         MyQposClass listener = new MyQposClass();
         pos = QPOSService.getInstance(mode);
+
         if (pos == null) {
-            statusEditText.setText("CommunicationMode unknow");
+            Log.e("Log TAG", "CommunicationMode unknow");
             return;
         }
         if (mode == CommunicationMode.USB_OTG_CDC_ACM) {
             pos.setUsbSerialDriver(QPOSService.UsbOTGDriver.CDCACM);
         }
+
         pos.setConext(PosActivity.this);
         pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
 
@@ -663,7 +676,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            statusEditText.setText(progress + "%");
+                            Log.e("Log TAG", progress + "%");
                         }
                     });
                     continue;
@@ -671,7 +684,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        statusEditText.setText("Update Finished 100%");
+                        Log.e("Log TAG", "Update Finished 100%");
                     }
                 });
 
@@ -694,7 +707,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         } else if (item.getItemId() == R.id.reset_qpos) {
             boolean a = pos.resetPosStatus();
             if (a) {
-                statusEditText.setText("pos reset");
+                Log.e("Log TAG", "pos reset");
             }
         } else if (item.getItemId() == R.id.doTradeLogOperation) {
             pos.doTradeLogOperation(DoTransactionType.GetAll, 0);
@@ -708,10 +721,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         } else if (item.getItemId() == R.id.set_shutdowm_time) {
             pos.setShutDownTime(15 * 60);
         } else if (item.getItemId() == R.id.menu_exchange_cert) {//inject key remotely
-            statusEditText.setText("Exchange Certificates the device with server...");
+            Log.e("Log TAG", "Exchange Certificates the device with server...");
             pos.getDeviceSigningCertificate();
         } else if (item.getItemId() == R.id.menu_init_key_loading) {//inject key remotely
-            statusEditText.setText("is go to init the keys loading...");
+            Log.e("Log TAG", "is go to init the keys loading...");
             if (deviceSignCert != null) {
                 String deviceNonce = ParseASN1Util.generateNonce();
                 verifySignatureCommand = getString(R.string.pedk_command, "10", deviceNonce, "1");
@@ -743,7 +756,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            statusEditText.setText("Init key...");
+            Log.e("Log TAG", "Init key...");
         }
         //update ipek
         else if (item.getItemId() == R.id.updateIPEK) {
@@ -756,39 +769,39 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         } else if (item.getItemId() == R.id.getSleepTime) {
             pos.getShutDownTime();
         } else if (item.getItemId() == R.id.updateEMVAPP) {
-            statusEditText.setText("updating emvapp...");
+            Log.e("Log TAG", "updating emvapp...");
             String appTLV = "9F0610000000000000000000000000000000005F2A0205665F3601009F01060000000000009F090200969F150200009F161e3030303030303030303030303030303030303030303030303030303030309F1A0205669F1B04000000009F1C0800000000000000009F1E0800000000000000009F33032009C89F3501229F3901009F3C0205669F3D01009F4005F000F0A0019F4E0f0000000000000000000000000000009F6604300040809F7B06000000001388DF010101DF11050000000000DF12050000000000DF13050000000000DF1400DF150400000000DF160100DF170100DF1906000000001388DF2006999999999999DF2106000000020000DF7208F4F0F0FAAFFE8000DF730101DF74010FDF750101DF7600DF7806000000020000DF7903E0F8C8DF7A05F000F0A001DF7B00";
             pos.updateEmvAPPByTlv(EMVDataOperation.Add, appTLV);
 
         } else if (item.getItemId() == R.id.updateEMVCAPK) {
-            statusEditText.setText("updating emvcapk...");
+            Log.e("Log TAG", "updating emvcapk...");
             String capkTLV = "9F0605A0000003339F22010BDF0281f8CF9FDF46B356378E9AF311B0F981B21A1F22F250FB11F55C958709E3C7241918293483289EAE688A094C02C344E2999F315A72841F489E24B1BA0056CFAB3B479D0E826452375DCDBB67E97EC2AA66F4601D774FEAEF775ACCC621BFEB65FB0053FC5F392AA5E1D4C41A4DE9FFDFDF1327C4BB874F1F63A599EE3902FE95E729FD78D4234DC7E6CF1ABABAA3F6DB29B7F05D1D901D2E76A606A8CBFFFFECBD918FA2D278BDB43B0434F5D45134BE1C2781D157D501FF43E5F1C470967CD57CE53B64D82974C8275937C5D8502A1252A8A5D6088A259B694F98648D9AF2CB0EFD9D943C69F896D49FA39702162ACB5AF29B90BADE005BC157DF0314BD331F9996A490B33C13441066A09AD3FEB5F66CDF0403000003DF050420311222DF060101DF070101";
             pos.updateEmvCAPKByTlv(EMVDataOperation.Add, capkTLV);
 
         } else if (item.getItemId() == R.id.setBuzzer) {
             pos.doSetBuzzerOperation(3);//set buzzer
         } else if (item.getItemId() == R.id.menu_get_deivce_info) {
-            statusEditText.setText(R.string.getting_info);
+            Log.e("Log TAG", String.valueOf(R.string.getting_info));
             pos.getQposInfo();
         } else if (item.getItemId() == R.id.menu_get_deivce_key_checkvalue) {
-            statusEditText.setText("get_deivce_key_checkvalue..............");
+            Log.e("Log TAG", "get_deivce_key_checkvalue..............");
             int keyIdex = getKeyIndex();
             pos.getKeyCheckValue(keyIdex, QPOSService.CHECKVALUE_KEYTYPE.DUKPT_MKSK_ALLTYPE);
         } else if (item.getItemId() == R.id.menu_get_pos_id) {
             pos.getQposId();
-            statusEditText.setText(R.string.getting_pos_id);
+            Log.e("Log TAG", String.valueOf(R.string.getting_pos_id));
         } else if (item.getItemId() == R.id.setMasterkey) {
             //key:0123456789ABCDEFFEDCBA9876543210
             //result；0123456789ABCDEFFEDCBA9876543210
             int keyIndex = getKeyIndex();
             pos.setMasterKey("1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885", keyIndex);
         } else if (item.getItemId() == R.id.menu_get_pin) {
-            statusEditText.setText(R.string.input_pin);
+            Log.e("Log TAG", String.valueOf(R.string.input_pin));
             pos.getPin(1, 0, 6, "please input pin", "622262XXXXXXXXX4406", "", 20);
         } else if (item.getItemId() == R.id.isCardExist) {
             pos.isCardExist(30);
         } else if (item.getItemId() == R.id.menu_operate_mafire) {
-            statusEditText.setText("operate mafire card");
+            Log.e("Log TAG", "operate mafire card");
             showSingleChoiceDialog();
         } else if (item.getItemId() == R.id.menu_operate_update) {
             if (updateFwBtn.getVisibility() == View.VISIBLE || btnQuickEMV.getVisibility() == View.VISIBLE) {
@@ -816,7 +829,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         } else if (item.getItemId() == R.id.closeDisplay) {
             pos.lcdShowCloseDisplay();
         } else if (item.getItemId() == R.id.updateEMVByXml) {
-            statusEditText.setText("updating...");
+            Log.e("Log TAG", "updating...");
 //            pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("QPOS cute,CR100,D20,D30.xml", MainActivity.this)));
             pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
         }
@@ -902,8 +915,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onRequestWaitingUser() {//wait user to insert/swipe/tap card
             TRACE.d("onRequestWaitingUser() insert/swipe/tap card " + "waiting_for_card");
+            TRACE.d("Insert Card" + "New SDK");
             dismissDialog();
-//            statusEditText.setText(getString(R.string.waiting_for_card));
+//            Log.e("Log TAG", getString(R.string.waiting_for_card));
         }
 
         @Override
@@ -913,11 +927,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dismissDialog();
             String cardNo = "";
             if (result == DoTradeResult.NONE) {
-                statusEditText.setText(getString(R.string.no_card_detected));
+                Log.e("Log TAG", getString(R.string.no_card_detected));
             } else if (result == QPOSService.DoTradeResult.TRY_ANOTHER_INTERFACE) {
-                statusEditText.setText(getString(R.string.try_another_interface));
+                Log.e("Log TAG", getString(R.string.try_another_interface));
             } else if (result == DoTradeResult.ICC) {
-//                statusEditText.setText(getString(R.string.icc_card_inserted));
+//                Log.e("Log TAG", getString(R.string.icc_card_inserted));
                 TRACE.d("EMV ICC Start, icc_card_inserted");
 //                String maskedPAN = decodeData.get("maskedPAN");
 //                String expiryDate = decodeData.get("expiryDate");
@@ -925,13 +939,13 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                Log.e("Check", maskedPAN +" "+ expiryDate +" "+ cardHolderName);
                 pos.doEmvApp(EmvOption.START);
             } else if (result == DoTradeResult.NOT_ICC) {
-                statusEditText.setText(getString(R.string.card_inserted));
+                Log.e("Log TAG", getString(R.string.card_inserted));
             } else if (result == DoTradeResult.BAD_SWIPE) {
-                statusEditText.setText(getString(R.string.bad_swipe));
+                Log.e("Log TAG", getString(R.string.bad_swipe));
             } else if (result == DoTradeResult.CARD_NOT_SUPPORT) {
-                statusEditText.setText("GPO NOT SUPPORT");
+                Log.e("Log TAG", "GPO NOT SUPPORT");
             } else if (result == DoTradeResult.PLS_SEE_PHONE) {
-                statusEditText.setText("PLS SEE PHONE");
+                Log.e("Log TAG", "PLS SEE PHONE");
             } else if (result == DoTradeResult.MCR) {//Magnetic card
                 String content = getString(R.string.card_swiped);
                 String formatID = decodeData.get("formatID");
@@ -1028,7 +1042,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                         content += "PIN:" + " " + s + "\n";
                     }
                 }
-                statusEditText.setText(content);
+                Log.e("Log TAG", content);
             } else if ((result == DoTradeResult.NFC_ONLINE) || (result == DoTradeResult.NFC_OFFLINE)) {
                 nfcLog = decodeData.get("nfcLog");
                 String content = getString(R.string.tap_card);
@@ -1127,12 +1141,12 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                             + "\n";
                     cardNo = maskedPAN;
                 }
-                statusEditText.setText(content);
+                Log.e("Log TAG", content);
                 sendMsg(8003);
             } else if ((result == DoTradeResult.NFC_DECLINED)) {
-                statusEditText.setText(getString(R.string.transaction_declined));
+                Log.e("Log TAG", getString(R.string.transaction_declined));
             } else if (result == DoTradeResult.NO_RESPONSE) {
-                statusEditText.setText(getString(R.string.card_no_response));
+                Log.e("Log TAG", getString(R.string.card_no_response));
             }
         }
 
@@ -1175,7 +1189,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             content += "PCI FirmwareVresion:" + pciFirmwareVersion + "\n";
             content += "PCI HardwareVersion:" + pciHardwareVersion + "\n";
             content += "compileTime:" + compileTime + "\n";
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
         }
 
         /**
@@ -1188,7 +1202,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 clearDisplay();
             }
             dismissDialog();
-            dialog = new Dialog(PosActivity.this);
+            dialog = new Dialog(PosActivity.this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
             dialog.setContentView(R.layout.alert_dialog);
             dialog.setTitle(R.string.transaction_result);
             TextView messageTextView = (TextView) dialog.findViewById(R.id.messageTextView);
@@ -1218,7 +1232,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else if (transactionResult == TransactionResult.DEVICE_ERROR) {
                 messageTextView.setText(getString(R.string.transaction_device_error));
             } else if (transactionResult == TransactionResult.TRADE_LOG_FULL) {
-                statusEditText.setText("pls clear the trace log and then to begin do trade");
+                Log.e("Log TAG", "pls clear the trace log and then to begin do trade");
                 messageTextView.setText("the trade log has fulled!pls clear the trade log!");
             } else if (transactionResult == TransactionResult.CARD_NOT_SUPPORTED) {
                 messageTextView.setText(getString(R.string.card_not_supported));
@@ -1229,7 +1243,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else if (transactionResult == TransactionResult.INVALID_ICC_DATA) {
                 messageTextView.setText(getString(R.string.invalid_icc_data));
             } else if (transactionResult == TransactionResult.FALLBACK) {
-                messageTextView.setText("trans fallback");
+                messageTextView.setText("trans fallback or card error, try again");
             } else if (transactionResult == TransactionResult.NFC_TERMINATED) {
                 clearDisplay();
                 messageTextView.setText("NFC Terminated");
@@ -1253,7 +1267,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     dismissDialog();
                 }
             });
-            dialog.show();
+//            dialog.show();
+            Toast.makeText(getApplicationContext(), messageTextView.getText(), Toast.LENGTH_SHORT).show();
             amount = "";
             cashbackAmount = "";
         }
@@ -1264,7 +1279,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String content = getString(R.string.batch_data);
             TRACE.d("onRequestBatchData(String tlv):" + tlv);
             content += tlv;
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
         }
 
         @Override
@@ -1273,12 +1288,13 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dismissDialog();
             String content = getString(R.string.transaction_log);
             content += tlv;
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
         }
 
         @Override
         public void onQposIdResult(Hashtable<String, String> posIdTable) {
             TRACE.w("onQposIdResult():" + posIdTable.toString());
+
             String posId = posIdTable.get("posId") == null ? "" : posIdTable.get("posId");
             serialNo = posId;
             String csn = posIdTable.get("csn") == null ? "" : posIdTable.get("csn");
@@ -1293,7 +1309,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             content += "psamId: " + psamId + "\n";
             content += "NFCId: " + NFCId + "\n";
             if (!isVisiblePosID) {
-                statusEditText.setText(content);
+                Log.e("Log TAG", content);
                 TRACE.w("onQposIdResult() content :" + content);
 
             } else {
@@ -1303,14 +1319,29 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             }
             isPinCanceled = false;
             terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
-            if (posType == POS_TYPE.UART) {
-                Log.e("TAG", "dotrade");
-                pos.doTrade(terminalTime, 0, 30);
-            } else {
-                Log.e("TAG", "start do trade");
+
+            if (appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_INJECTED)
+                    && appPreferenceHelper.getSharedPreferenceString(Constants.KEY_INJECTED_BLUETOOTH).equals(blueTootchAddress)) {
+                pos_view_update.setText("Insert Card into mPOS");
+                if (posType == POS_TYPE.UART) {
+                    Log.e("TAG", "dotrade");
+                    pos.doTrade(terminalTime, 0, 60);
+                } else {
+                    Log.e("TAG", "start do trade");
 //                int keyIdex = getKeyIndex();
-                pos.doTrade(0, 30);//start do trade
+                    pos.doTrade(0, 30);//start do trade
+                }
+            }else {
+                if (pos == null) {
+                    pos = QPOSService.getInstance(CommunicationMode.BLUETOOTH);
+                    pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
+                    Log.e("TAG open", "updating...");
+                } else {
+                    pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
+                    Log.e("TAG open", "updating...");
+                }
             }
+
         }
 
         @Override
@@ -1354,9 +1385,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onRequestSetAmount() {
             TRACE.d("input amount -- S");
-            TRACE.d("onRequestSetAmount()" + totalAmount);
-            TRACE.d("onRequestSetAmount()" + Long.toString(totalAmount.longValue()));
-            pos.setAmount(Long.toString(totalAmount.longValue()) + 00, cashbackAmount, "566", TransactionType.GOODS);
+            Log.e("TAG", "onRequestSetAmount()" + totalAmount);
+            Log.e("TAG", "onRequestSetAmount()" + Long.toString(totalAmount.longValue()));
+            pos.setAmount(totalAmount.longValue() + "00", cashbackAmount, "566", TransactionType.GOODS);
 
 //            dismissDialog();
 //            dialog = new Dialog(MainActivity.this);
@@ -1473,6 +1504,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String countryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F1A"));
             Log.e("Tag countryCode", countryCode.substring(5, countryCode.length() - 1));
 
+            String terminalCountryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F28"));
+            Log.e("Tag terminalCountryCode", terminalCountryCode.substring(5, terminalCountryCode.length() - 1));
+
             creditCard.setCardNumber(cardNo);
             creditCard.setExpireDate(expiryDate);
 
@@ -1534,7 +1568,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
             pos.sendTime(terminalTime);
             TRACE.d("onRequestTime" + getString(R.string.request_terminal_time) + " " + terminalTime);
-//            statusEditText.setText(getString(R.string.request_terminal_time) + " " + terminalTime);
+//            Log.e("Log TAG", getString(R.string.request_terminal_time) + " " + terminalTime);
         }
 
         @Override
@@ -1570,8 +1604,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else if (displayMsg == Display.CARD_REMOVED) {
                 msg = "card removed";
             }
-            TRACE.d("onRequestDisplay(Display displayMsg):" +  msg);
-//            statusEditText.setText(msg);
+            TRACE.d("onRequestDisplay(Display displayMsg):" + msg);
+//            Log.e("Log TAG", msg);
         }
 
         @Override
@@ -1613,17 +1647,17 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onRequestNoQposDetected() {
             TRACE.d("onRequestNoQposDetected()");
             dismissDialog();
-//            statusEditText.setText(getString(R.string.no_device_detected));
+//            Log.e("Log TAG", getString(R.string.no_device_detected));
         }
 
         @Override
         public void onRequestQposConnected() {
             TRACE.d("onRequestQposConnected()");
-            Toast.makeText(PosActivity.this, "onRequestQposConnected", Toast.LENGTH_LONG).show();
+            Toast.makeText(PosActivity.this, "Mpos Connected", Toast.LENGTH_LONG).show();
             dismissDialog();
             long use_time = new Date().getTime() - start_time;
-            // statusEditText.setText(getString(R.string.device_plugged));
-//            statusEditText.setText(getString(R.string.device_plugged) + "--" + getResources().getString(R.string.used) + QPOSUtil.formatLongToTimeStr(use_time, PosActivity.this));
+            // Log.e("Log TAG", getString(R.string.device_plugged));
+//            Log.e("Log TAG", getString(R.string.device_plugged) + "--" + getResources().getString(R.string.used) + QPOSUtil.formatLongToTimeStr(use_time, PosActivity.this));
 //            doTradeButton.setEnabled(true);
 //            btnDisconnect.setEnabled(true);
 //            btnQuickEMV.setEnabled(true);
@@ -1647,7 +1681,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dismissDialog();
             setTitle(title);
             TRACE.d("onRequestQposDisconnected() Pos Disconnected");
-//            statusEditText.setText(getString(R.string.device_unplugged));
+//            Log.e("Log TAG", getString(R.string.device_unplugged));
 //            btnDisconnect.setEnabled(false);
 //            doTradeButton.setEnabled(false);
 //            lin_remote_key_load.setVisibility(View.GONE);
@@ -1661,41 +1695,42 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             TRACE.d("onError" + errorState.toString());
             dismissDialog();
             if (errorState == Error.CMD_NOT_AVAILABLE) {
-                statusEditText.setText(getString(R.string.command_not_available));
+                Log.e("Log TAG", getString(R.string.command_not_available));
             } else if (errorState == Error.TIMEOUT) {
-                statusEditText.setText(getString(R.string.device_no_response));
+                Log.e("Log TAG", getString(R.string.device_no_response));
             } else if (errorState == Error.DEVICE_RESET) {
-                statusEditText.setText(getString(R.string.device_reset));
+                Log.e("Log TAG", getString(R.string.device_reset));
             } else if (errorState == Error.UNKNOWN) {
-                statusEditText.setText(getString(R.string.unknown_error));
+                Log.e("Log TAG", getString(R.string.unknown_error));
             } else if (errorState == Error.DEVICE_BUSY) {
-                statusEditText.setText(getString(R.string.device_busy));
+                Log.e("Log TAG", getString(R.string.device_busy));
             } else if (errorState == Error.INPUT_OUT_OF_RANGE) {
-                statusEditText.setText(getString(R.string.out_of_range));
+                Log.e("Log TAG", getString(R.string.out_of_range));
             } else if (errorState == Error.INPUT_INVALID_FORMAT) {
-                statusEditText.setText(getString(R.string.invalid_format));
+                Log.e("Log TAG", getString(R.string.invalid_format));
             } else if (errorState == Error.INPUT_ZERO_VALUES) {
-                statusEditText.setText(getString(R.string.zero_values));
+                Log.e("Log TAG", getString(R.string.zero_values));
             } else if (errorState == Error.INPUT_INVALID) {
-                statusEditText.setText(getString(R.string.input_invalid));
+                Log.e("Log TAG", getString(R.string.input_invalid));
             } else if (errorState == Error.CASHBACK_NOT_SUPPORTED) {
-                statusEditText.setText(getString(R.string.cashback_not_supported));
+                Log.e("Log TAG", getString(R.string.cashback_not_supported));
             } else if (errorState == Error.CRC_ERROR) {
-                statusEditText.setText(getString(R.string.crc_error));
+                Log.e("Log TAG", getString(R.string.crc_error));
             } else if (errorState == Error.COMM_ERROR) {
-                statusEditText.setText(getString(R.string.comm_error));
+                Log.e("Log TAG", getString(R.string.comm_error));
             } else if (errorState == Error.MAC_ERROR) {
-                statusEditText.setText(getString(R.string.mac_error));
+                Log.e("Log TAG", getString(R.string.mac_error));
             } else if (errorState == Error.APP_SELECT_TIMEOUT) {
-                statusEditText.setText(getString(R.string.app_select_timeout_error));
+                Log.e("Log TAG", getString(R.string.app_select_timeout_error));
             } else if (errorState == Error.CMD_TIMEOUT) {
-                statusEditText.setText(getString(R.string.cmd_timeout));
+                Log.e("Log TAG", getString(R.string.cmd_timeout));
             } else if (errorState == Error.ICC_ONLINE_TIMEOUT) {
                 if (pos == null) {
                     return;
                 }
                 pos.resetPosStatus();
-                statusEditText.setText(getString(R.string.device_reset));
+                Log.e("TAG POS", getString(R.string.device_reset));
+                Toast.makeText(getApplicationContext(), R.string.device_reset, Toast.LENGTH_LONG).show();
             }
         }
 
@@ -1704,16 +1739,16 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String content = getString(R.string.reversal_data);
             content += tlv;
             TRACE.d("onReturnReversalData(): " + tlv);
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
         }
 
         @Override
         public void onReturnupdateKeyByTR_31Result(boolean result, String keyType) {
             super.onReturnupdateKeyByTR_31Result(result, keyType);
             if (result) {
-                statusEditText.setText("send TR31 key success! The keyType is " + keyType);
+                Log.e("Log TAG", "send TR31 key success! The keyType is " + keyType);
             } else {
-                statusEditText.setText("send TR31 key fail");
+                Log.e("Log TAG", "send TR31 key fail");
             }
         }
 
@@ -1732,7 +1767,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             content += getString(R.string.pinBlock) + " " + pinBlock + "\n";
 
             TRACE.d("Check pinblock" + getString(R.string.pinBlock) + " " + pinBlock + "\n");
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
             TRACE.i(content);
         }
 
@@ -1763,13 +1798,13 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else {
                 content = "set the sleep time failed.";
             }
-            statusEditText.setText(content);
+            Log.e("Log TAG", content);
         }
 
         @Override
         public void onGetCardNoResult(String cardNo) {
             TRACE.d("onGetCardNoResult(String cardNo):" + cardNo);
-            statusEditText.setText("cardNo: " + cardNo);
+            Log.e("Log TAG", "cardNo: " + cardNo);
         }
 
         @Override
@@ -1778,7 +1813,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             if (calMac != null && !"".equals(calMac)) {
                 calMac = QPOSUtil.byteArray2Hex(calMac.getBytes());
             }
-            statusEditText.setText("calMac: " + calMac);
+            Log.e("Log TAG", "calMac: " + calMac);
             TRACE.d("calMac_result: calMac=> e: " + calMac);
         }
 
@@ -1791,20 +1826,28 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onRequestUpdateWorkKeyResult(UpdateInformationResult result) {
             TRACE.d("onRequestUpdateWorkKeyResult(UpdateInformationResult result):" + result);
             if (result == UpdateInformationResult.UPDATE_SUCCESS) {
-                statusEditText.setText("update work key success");
+                Log.e("Log TAG", "update work key success");
             } else if (result == UpdateInformationResult.UPDATE_FAIL) {
-                statusEditText.setText("update work key fail");
+                Log.e("Log TAG", "update work key fail");
             } else if (result == UpdateInformationResult.UPDATE_PACKET_VEFIRY_ERROR) {
-                statusEditText.setText("update work key packet vefiry error");
+                Log.e("Log TAG", "update work key packet vefiry error");
             } else if (result == UpdateInformationResult.UPDATE_PACKET_LEN_ERROR) {
-                statusEditText.setText("update work key packet len error");
+                Log.e("Log TAG", "update work key packet len error");
             }
         }
 
         @Override
         public void onReturnCustomConfigResult(boolean isSuccess, String result) {
-            TRACE.d("onReturnCustomConfigResult(boolean isSuccess, String result):" + isSuccess + TRACE.NEW_LINE + result);
-            statusEditText.setText("result: " + isSuccess + "\ndata: " + result);
+            if (isSuccess){
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_INJECTED, true);
+                appPreferenceHelper.setSharedPreferenceString(Constants.KEY_INJECTED_BLUETOOTH, blueTootchAddress);
+                Log.e("Log TAG", "Key Injected: " + isSuccess + "\nblueTootchAddress: " + blueTootchAddress);
+            }else {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_INJECTED, false);
+            }
+            sendMsg(1203);
+            Log.e("onReturnCustomConfigResult(boolean isSuccess, String result):", isSuccess + TRACE.NEW_LINE + result);
+            Log.e("Log TAG", "result: " + isSuccess + "\ndata: " + result);
         }
 
         @Override
@@ -1813,9 +1856,16 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             creditCard = new CreditCard();
 
             dismissDialog();
-            dialog = new Dialog(PosActivity.this);
-            dialog.setContentView(R.layout.pin_dialog);
+            dialog = new Dialog(PosActivity.this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+//            dialog.setContentView(R.layout.pin_dialog);
+//            dialog.setTitle(getString(R.string.enter_pin));
+
+            final View view = getLayoutInflater().inflate(R.layout.pin_dialog, null);
+            dialog.setContentView(view);
             dialog.setTitle(getString(R.string.enter_pin));
+
+//            pinEditText = (EditText) dialog.findViewById(R.id.pinEditText);
+
             dialog.findViewById(R.id.confirmButton).setOnClickListener(new OnClickListener() {
 
                 @Override
@@ -1828,7 +1878,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                        } else {
 //                            pos.sendPin(pin);
 //                        }
-                        TRACE.d("myPinblock" + " " + pin);
+//                        TRACE.d("myPinblock" + " " + pin);
+
+                        pos_view_update.setText("Processing Transaction");
                         cPin = pin;
                         creditCard.setPIN(pin);
                         pos.sendPin(pin);
@@ -1837,16 +1889,17 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     }
                 }
             });
-            dialog.findViewById(R.id.bypassButton).setOnClickListener(new OnClickListener() {
 
-                @Override
-                public void onClick(View v) {
-//					pos.bypassPin();
-                    pos.sendPin("");
-
-                    dismissDialog();
-                }
-            });
+//            dialog.findViewById(R.id.bypassButton).setOnClickListener(new OnClickListener() {
+//
+//                @Override
+//                public void onClick(View v) {
+////					pos.bypassPin();
+//                    pos.sendPin("");
+//
+//                    dismissDialog();
+//                }
+//            });
 
             dialog.findViewById(R.id.cancelButton).setOnClickListener(new OnClickListener() {
 
@@ -1863,7 +1916,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onReturnSetMasterKeyResult(boolean isSuccess) {
             TRACE.d("onReturnSetMasterKeyResult(boolean isSuccess) : " + isSuccess);
-            statusEditText.setText("result: " + isSuccess);
+            Log.e("Log TAG", "result: " + isSuccess);
         }
 
         @Override
@@ -1874,31 +1927,31 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             for (HashMap.Entry<Integer, String> entry : batchAPDUResult.entrySet()) {
                 sb.append("[" + entry.getKey() + "]: " + entry.getValue() + "\n");
             }
-            statusEditText.setText("\n" + sb.toString());
+            Log.e("Log TAG", "\n" + sb.toString());
         }
 
         @Override
         public void onBluetoothBondFailed() {
             TRACE.d("onBluetoothBondFailed()");
-            statusEditText.setText("bond failed");
+            Log.e("Log TAG", "bond failed");
         }
 
         @Override
         public void onBluetoothBondTimeout() {
             TRACE.d("onBluetoothBondTimeout()");
-            statusEditText.setText("bond timeout");
+            Log.e("Log TAG", "bond timeout");
         }
 
         @Override
         public void onBluetoothBonded() {
             TRACE.d("onBluetoothBonded()");
-            statusEditText.setText("bond success");
+            Log.e("Log TAG", "bond success");
         }
 
         @Override
         public void onBluetoothBonding() {
             TRACE.d("onBluetoothBonding()");
-            statusEditText.setText("bonding .....");
+            Log.e("Log TAG", "bonding .....");
         }
 
         @Override
@@ -1907,7 +1960,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String s = "serviceCode: " + result.get("serviceCode");
             s += "\n";
             s += "trackblock: " + result.get("trackblock");
-            statusEditText.setText(s);
+            Log.e("Log TAG", s);
         }
 
         @Override
@@ -1924,7 +1977,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else {
                 mhipStatus.setText("");
             }
-            statusEditText.setText("onUpdatePosFirmwareResult" + arg0.toString());
+            Log.e("Log TAG", "onUpdatePosFirmwareResult" + arg0.toString());
         }
 
         @Override
@@ -1939,7 +1992,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String randomKeyCheckValueLen = map.get("randomKeyCheckValueLen");
             String randomKeyCheckValue = map.get("randomKeyCheckValue");
             TRACE.d("randomKey" + randomKey + "    \n    randomKeyCheckValue" + randomKeyCheckValue);
-            statusEditText.setText("randomKeyLen:" + randomKeyLen + "\nrandomKey:" + randomKey + "\nrandomKeyCheckValueLen:" + randomKeyCheckValueLen + "\nrandomKeyCheckValue:"
+            Log.e("Log TAG", "randomKeyLen:" + "randomKeyLen" + "\nrandomKey:" + randomKey + "\nrandomKeyCheckValueLen:" + randomKeyCheckValueLen + "\nrandomKeyCheckValue:"
                     + randomKeyCheckValue);
         }
 
@@ -1951,7 +2004,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onPinKey_TDES_Result(String arg0) {
             TRACE.d("onPinKey_TDES_Result(String arg0):" + arg0);
-            statusEditText.setText("result:" + arg0);
+            Log.e("Log TAG", "result:" + arg0);
         }
 
         @Override
@@ -1977,28 +2030,28 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onReturnNFCApduResult(boolean arg0, String arg1, int arg2) {
             TRACE.d("onReturnNFCApduResult(boolean arg0, String arg1, int arg2):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2);
-            statusEditText.setText("onReturnNFCApduResult(boolean arg0, String arg1, int arg2):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2);
+            Log.e("Log TAG", "onReturnNFCApduResult(boolean arg0, String arg1, int arg2):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2);
         }
 
         @Override
         public void onReturnPowerOffNFCResult(boolean arg0) {
             TRACE.d(" onReturnPowerOffNFCResult(boolean arg0) :" + arg0);
-            statusEditText.setText(" onReturnPowerOffNFCResult(boolean arg0) :" + arg0);
+            Log.e("Log TAG", "onReturnPowerOffNFCResult(boolean arg0) :" + arg0);
         }
 
         @Override
         public void onReturnPowerOnNFCResult(boolean arg0, String arg1, String arg2, int arg3) {
             TRACE.d("onReturnPowerOnNFCResult(boolean arg0, String arg1, String arg2, int arg3):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2 + TRACE.NEW_LINE + arg3);
-            statusEditText.setText("onReturnPowerOnNFCResult(boolean arg0, String arg1, String arg2, int arg3):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2 + TRACE.NEW_LINE + arg3);
+            Log.e("Log TAG", "onReturnPowerOnNFCResult(boolean arg0, String arg1, String arg2, int arg3):" + arg0 + TRACE.NEW_LINE + arg1 + TRACE.NEW_LINE + arg2 + TRACE.NEW_LINE + arg3);
         }
 
         @Override
         public void onCbcMacResult(String result) {
             TRACE.d("onCbcMacResult(String result):" + result);
             if (result == null || "".equals(result)) {
-                statusEditText.setText("cbc_mac:false");
+                Log.e("Log TAG", "cbc_mac:false");
             } else {
-                statusEditText.setText("cbc_mac: " + result);
+                Log.e("Log TAG", "cbc_mac: " + result);
             }
         }
 
@@ -2021,9 +2074,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onQposIsCardExist(boolean cardIsExist) {
             TRACE.d("onQposIsCardExist(boolean cardIsExist):" + cardIsExist);
             if (cardIsExist) {
-                statusEditText.setText("cardIsExist:" + cardIsExist);
+                Log.e("Log TAG", "cardIsExist:" + cardIsExist);
             } else {
-                statusEditText.setText("cardIsExist:" + cardIsExist);
+                Log.e("Log TAG", "cardIsExist:" + cardIsExist);
             }
         }
 
@@ -2039,11 +2092,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String cardAts = arg0.get("cardAts");
                 String ATQA = arg0.get("ATQA");
                 String SAK = arg0.get("SAK");
-                statusEditText.setText("statuString:" + statuString + "\n" + "cardTypeString:" + cardTypeString + "\ncardUidLen:" + cardUidLen
+                Log.e("Log TAG", "statuString:" + statuString + "\n" + "cardTypeString:" + cardTypeString + "\ncardUidLen:" + cardUidLen
                         + "\ncardUid:" + cardUid + "\ncardAtsLen:" + cardAtsLen + "\ncardAts:" + cardAts
                         + "\nATQA:" + ATQA + "\nSAK:" + SAK);
             } else {
-                statusEditText.setText("poll card failed");
+                Log.e("Log TAG", "poll card failed");
             }
         }
 
@@ -2065,9 +2118,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onSetBuzzerResult(boolean arg0) {
             TRACE.d("onSetBuzzerResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("Set buzzer success");
+                Log.e("Log TAG", "Set buzzer success");
             } else {
-                statusEditText.setText("Set buzzer failed");
+                Log.e("Log TAG", "Set buzzer failed");
             }
         }
 
@@ -2090,9 +2143,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onSetManagementKey(boolean arg0) {
             TRACE.d("onSetManagementKey(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("Set master key success");
+                Log.e("Log TAG", "Set master key success");
             } else {
-                statusEditText.setText("Set master key failed");
+                Log.e("Log TAG", "Set master key failed");
             }
         }
 
@@ -2100,9 +2153,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onReturnUpdateIPEKResult(boolean arg0) {
             TRACE.d("onReturnUpdateIPEKResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("update IPEK success");
+                Log.e("Log TAG", "update IPEK success");
             } else {
-                statusEditText.setText("update IPEK fail");
+                Log.e("Log TAG", "update IPEK fail");
             }
         }
 
@@ -2141,10 +2194,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String address = arg0.getAddress();
                 String name = arg0.getName();
                 name += address + "\n";
-                statusEditText.setText(name);
+                Log.e("Log TAG", name);
                 TRACE.d("found new device" + name);
             } else {
-                statusEditText.setText("Don't found new device");
+                Log.e("Log TAG", "Don't found new device");
                 TRACE.d("Don't found new device");
             }
         }
@@ -2153,9 +2206,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onSetSleepModeTime(boolean arg0) {
             TRACE.d("onSetSleepModeTime(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("set the Sleep timee Success");
+                Log.e("Log TAG", "set the Sleep timee Success");
             } else {
-                statusEditText.setText("set the Sleep timee unSuccess");
+                Log.e("Log TAG", "set the Sleep timee unSuccess");
             }
         }
 
@@ -2163,7 +2216,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onReturnGetEMVListResult(String arg0) {
             TRACE.d("onReturnGetEMVListResult(String arg0):" + arg0);
             if (arg0 != null && arg0.length() > 0) {
-                statusEditText.setText("The emv list is : " + arg0);
+                Log.e("Log TAG", "The emv list is : " + arg0);
             }
         }
 
@@ -2193,10 +2246,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onReturnGetQuickEmvResult(boolean arg0) {
             TRACE.d("onReturnGetQuickEmvResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("emv configed");
+                Log.e("Log TAG", "emv configed");
                 pos.setQuickEmv(true);
             } else {
-                statusEditText.setText("emv don't configed");
+                Log.e("Log TAG", "emv don't configed");
             }
         }
 
@@ -2205,19 +2258,19 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             TRACE.d("onQposDoGetTradeLogNum(String arg0):" + arg0);
             int a = Integer.parseInt(arg0, 16);
             if (a >= 188) {
-                statusEditText.setText("the trade num has become max value!!");
+                Log.e("Log TAG", "the trade num has become max value!!");
                 return;
             }
-            statusEditText.setText("get log num:" + a);
+            Log.e("Log TAG", "get log num:" + a);
         }
 
         @Override
         public void onQposDoTradeLog(boolean arg0) {
             TRACE.d("onQposDoTradeLog(boolean arg0) :" + arg0);
             if (arg0) {
-                statusEditText.setText("clear log success!");
+                Log.e("Log TAG", "clear log success!");
             } else {
-                statusEditText.setText("clear log fail!");
+                Log.e("Log TAG", "clear log fail!");
             }
         }
 
@@ -2225,9 +2278,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onAddKey(boolean arg0) {
             TRACE.d("onAddKey(boolean arg0) :" + arg0);
             if (arg0) {
-                statusEditText.setText("ksn add 1 success");
+                Log.e("Log TAG", "ksn add 1 success");
             } else {
-                statusEditText.setText("ksn add 1 failed");
+                Log.e("Log TAG", "ksn add 1 failed");
             }
         }
 
@@ -2251,7 +2304,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onQposDoGetTradeLog(String arg0, String arg1) {
             TRACE.d("onQposDoGetTradeLog(String arg0, String arg1):" + arg0 + TRACE.NEW_LINE + arg1);
             arg1 = QPOSUtil.convertHexToString(arg1);
-            statusEditText.setText("orderId:" + arg1 + "\ntrade log:" + arg0);
+            Log.e("Log TAG", "orderId:" + arg1 + "\ntrade log:" + arg0);
         }
 
         @Override
@@ -2280,14 +2333,14 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     buffer.append(checkValue.get(i)).append(",");
                 }
                 buffer.append("}");
-                statusEditText.setText(buffer.toString());
+                Log.e("Log TAG", buffer.toString());
             }
         }
 
         @Override
         public void onGetDevicePubKey(String clearKeys) {
             TRACE.d("onGetDevicePubKey(clearKeys):" + clearKeys);
-            statusEditText.setText(clearKeys);
+            Log.e("Log TAG", clearKeys);
             String lenStr = clearKeys.substring(0, 4);
             int sum = 0;
             for (int i = 0; i < 4; i++) {
@@ -2301,9 +2354,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //        public void onSetPosBlePinCode(boolean b) {
 //            TRACE.d("onSetPosBlePinCode(b):" + b);
 //            if (b) {
-//                statusEditText.setText("onSetPosBlePinCode success");
+//                Log.e("Log TAG", "onSetPosBlePinCode success");
 //            } else {
-//                statusEditText.setText("onSetPosBlePinCode fail");
+//                Log.e("Log TAG", "onSetPosBlePinCode fail");
 //            }
 //        }
 
@@ -2318,22 +2371,22 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             if (b) {
                 BASE64Encoder base64Encoder = new BASE64Encoder();
                 String encode = base64Encoder.encode(signaturedData.getBytes());
-                statusEditText.setText("signature data (Base64 encoding):" + encode);
+                Log.e("Log TAG", "signature data (Base64 encoding):" + encode);
             }
         }
 
         @Override
         public void onReturnConverEncryptedBlockFormat(String result) {
-            statusEditText.setText(result);
+            Log.e("Log TAG", result);
         }
 
         @Override
         public void onFinishMifareCardResult(boolean arg0) {
             TRACE.d("onFinishMifareCardResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("finish success");
+                Log.e("Log TAG", "finish success");
             } else {
-                statusEditText.setText("finish fail");
+                Log.e("Log TAG", "finish fail");
             }
         }
 
@@ -2341,9 +2394,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onVerifyMifareCardResult(boolean arg0) {
             TRACE.d("onVerifyMifareCardResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText(" onVerifyMifareCardResult success");
+                Log.e("Log TAG", "onVerifyMifareCardResult success");
             } else {
-                statusEditText.setText("onVerifyMifareCardResult fail");
+                Log.e("Log TAG", "onVerifyMifareCardResult fail");
             }
         }
 
@@ -2354,9 +2407,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String addr = arg0.get("addr");
                 String cardDataLen = arg0.get("cardDataLen");
                 String cardData = arg0.get("cardData");
-                statusEditText.setText("addr:" + addr + "\ncardDataLen:" + cardDataLen + "\ncardData:" + cardData);
+                Log.e("Log TAG", "addr:" + addr + "\ncardDataLen:" + cardDataLen + "\ncardData:" + cardData);
             } else {
-                statusEditText.setText("onReadWriteMifareCardResult fail");
+                Log.e("Log TAG", "onReadWriteMifareCardResult fail");
             }
         }
 
@@ -2364,9 +2417,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onWriteMifareCardResult(boolean arg0) {
             TRACE.d("onWriteMifareCardResult(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("write data success!");
+                Log.e("Log TAG", "write data success!");
             } else {
-                statusEditText.setText("write data fail!");
+                Log.e("Log TAG", "write data fail!");
             }
         }
 
@@ -2376,9 +2429,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 TRACE.d("onOperateMifareCardResult(Hashtable<String, String> arg0):" + arg0.toString());
                 String cmd = arg0.get("Cmd");
                 String blockAddr = arg0.get("blockAddr");
-                statusEditText.setText("Cmd:" + cmd + "\nBlock Addr:" + blockAddr);
+                Log.e("Log TAG", "Cmd:" + cmd + "\nBlock Addr:" + blockAddr);
             } else {
-                statusEditText.setText("operate failed");
+                Log.e("Log TAG", "operate failed");
             }
         }
 
@@ -2389,9 +2442,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
                 String verLen = arg0.get("versionLen");
                 String ver = arg0.get("cardVersion");
-                statusEditText.setText("versionLen:" + verLen + "\nverison:" + ver);
+                Log.e("Log TAG", "versionLen:" + verLen + "\nverison:" + ver);
             } else {
-                statusEditText.setText("get mafire UL version failed");
+                Log.e("Log TAG", "get mafire UL version failed");
             }
         }
 
@@ -2403,10 +2456,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String endAddr = arg0.get("endAddr");
                 String dataLen = arg0.get("dataLen");
                 String cardData = arg0.get("cardData");
-                statusEditText.setText("startAddr:" + startAddr + "\nendAddr:" + endAddr + "\ndataLen:" + dataLen
+                Log.e("Log TAG", "startAddr:" + startAddr + "\nendAddr:" + endAddr + "\ndataLen:" + dataLen
                         + "\ncardData:" + cardData);
             } else {
-                statusEditText.setText("read fast UL failed");
+                Log.e("Log TAG", "read fast UL failed");
             }
         }
 
@@ -2417,9 +2470,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String blockAddr = arg0.get("blockAddr");
                 String dataLen = arg0.get("dataLen");
                 String cardData = arg0.get("cardData");
-                statusEditText.setText("blockAddr:" + blockAddr + "\ndataLen:" + dataLen + "\ncardData:" + cardData);
+                Log.e("Log TAG", "blockAddr:" + blockAddr + "\ndataLen:" + dataLen + "\ncardData:" + cardData);
             } else {
-                statusEditText.setText("read mafire UL failed");
+                Log.e("Log TAG", "read mafire UL failed");
             }
         }
 
@@ -2427,9 +2480,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void writeMifareULData(String arg0) {
             if (arg0 != null) {
                 TRACE.d("writeMifareULData(String arg0):" + arg0);
-                statusEditText.setText("addr:" + arg0);
+                Log.e("Log TAG", "addr:" + arg0);
             } else {
-                statusEditText.setText("write UL failed");
+                Log.e("Log TAG", "write UL failed");
             }
         }
 
@@ -2439,9 +2492,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 TRACE.d("verifyMifareULData(Hashtable<String, String> arg0):" + arg0.toString());
                 String dataLen = arg0.get("dataLen");
                 String pack = arg0.get("pack");
-                statusEditText.setText("dataLen:" + dataLen + "\npack:" + pack);
+                Log.e("Log TAG", "dataLen:" + dataLen + "\npack:" + pack);
             } else {
-                statusEditText.setText("verify UL failed");
+                Log.e("Log TAG", "verify UL failed");
             }
         }
 
@@ -2451,9 +2504,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 TRACE.d("onGetSleepModeTime(String arg0):" + arg0.toString());
 
                 int time = Integer.parseInt(arg0, 16);
-                statusEditText.setText("time is ： " + time + " seconds");
+                Log.e("Log TAG", "time is ： " + time + " seconds");
             } else {
-                statusEditText.setText("get the time is failed");
+                Log.e("Log TAG", "get the time is failed");
             }
         }
 
@@ -2461,9 +2514,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onGetShutDownTime(String arg0) {
             if (arg0 != null) {
                 TRACE.d("onGetShutDownTime(String arg0):" + arg0.toString());
-                statusEditText.setText("shut down time is : " + Integer.parseInt(arg0, 16) + "s");
+                Log.e("Log TAG", "shut down time is : " + Integer.parseInt(arg0, 16) + "s");
             } else {
-                statusEditText.setText("get the shut down time is fail!");
+                Log.e("Log TAG", "get the shut down time is fail!");
             }
         }
 
@@ -2471,9 +2524,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onQposDoSetRsaPublicKey(boolean arg0) {
             TRACE.d("onQposDoSetRsaPublicKey(boolean arg0):" + arg0);
             if (arg0) {
-                statusEditText.setText("set rsa is successed!");
+                Log.e("Log TAG", "set rsa is successed!");
             } else {
-                statusEditText.setText("set rsa is failed!");
+                Log.e("Log TAG", "set rsa is failed!");
             }
         }
 
@@ -2486,10 +2539,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String enKcvPinKeyData = arg0.get("enPinKcvKey");
                 String enCardKeyData = arg0.get("enDataCardKey");
                 String enKcvCardKeyData = arg0.get("enKcvDataCardKey");
-                statusEditText.setText("rsaFileName:" + rsaFileName + "\nenPinKeyData:" + enPinKeyData + "\nenKcvPinKeyData:" +
+                Log.e("Log TAG", "rsaFileName:" + rsaFileName + "\nenPinKeyData:" + enPinKeyData + "\nenKcvPinKeyData:" +
                         enKcvPinKeyData + "\nenCardKeyData:" + enCardKeyData + "\nenKcvCardKeyData:" + enKcvCardKeyData);
             } else {
-                statusEditText.setText("get key failed,pls try again!");
+                Log.e("Log TAG", "get key failed,pls try again!");
             }
         }
 
@@ -2499,9 +2552,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
             // TODO Auto-generated method stub
             if (arg0 != null) {
-                statusEditText.setText("response data:" + arg0);
+                Log.e("Log TAG", "response data:" + arg0);
             } else {
-                statusEditText.setText("transfer data failed!");
+                Log.e("Log TAG", "transfer data failed!");
             }
         }
 
@@ -2510,9 +2563,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             TRACE.d("onReturnRSAResult(String arg0):" + arg0.toString());
 
             if (arg0 != null) {
-                statusEditText.setText("rsa data:\n" + arg0);
+                Log.e("Log TAG", "rsa data:\n" + arg0);
             } else {
-                statusEditText.setText("get the rsa failed");
+                Log.e("Log TAG", "get the rsa failed");
             }
         }
 
@@ -2525,17 +2578,17 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onReturnDeviceCSRResult(String re) {
             TRACE.d("onReturnDeviceCSRResult:" + re);
-            statusEditText.setText("onReturnDeviceCSRResult:" + re);
+            Log.e("Log TAG", "onReturnDeviceCSRResult:" + re);
         }
 
         @Override
         public void onReturnStoreCertificatesResult(boolean re) {
             TRACE.d("onReturnStoreCertificatesResult:" + re);
             if (isInitKey) {
-                statusEditText.setText("Init key result is :" + re);
+                Log.e("Log TAG", "Init key result is :" + re);
                 isInitKey = false;
             } else {
-                statusEditText.setText("Exchange Certificates result is :" + re);
+                Log.e("Log TAG", "Exchange Certificates result is :" + re);
             }
 
         }
@@ -2555,7 +2608,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 String caChain = QPOSUtil.byteArray2Hex(base64Decoder.decodeBuffer(QPOSUtil.readRSANStream(getAssets().open("FX-Dspread-CA-Tree.pem"))));
                 //the api callback is onReturnStoreCertificatesResult
                 pos.loadCertificates(cc, cd, caChain);
-//                statusEditText.setText("is load the server cert to device...");
+//                Log.e("Log TAG", "is load the server cert to device...");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -2594,14 +2647,14 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     //the api callback is onRequestUpdateWorkKeyResult
                     pos.loadSessionKeyByTR_34(envelop);
                 } else {
-                    statusEditText.setText("signature verification successful.");
+                    Log.e("Log TAG", "signature verification successful.");
                     ParseASN1Util.parseASN1new(KB);
                     String data = ParseASN1Util.getTr31Data();
                     //the api callback is onReturnupdateKeyByTR_31Result
                     pos.updateKeyByTR_31(data, 30);
                 }
             } else {
-                statusEditText.setText("signature verification failed.");
+                Log.e("Log TAG", "signature verification failed.");
             }
         }
     }
@@ -2623,8 +2676,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         String workingKey = ksnUtilitites.getWorkingKey("3F2216D8297BCE9C", getInitialKSN());
         String pinBlock = ksnUtilitites.DesEncryptDukpt(workingKey, response.pan, cPin);
 
-
         ksn = ksnUtilitites.getLatestKsn();
+
         response.ksn = ksn;
         response.pinBlock = pinBlock;
         response.terminalId = "2076NA61";
@@ -2662,7 +2715,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         response.serialNumber = getDeviceMac();
         response.device = "Mpos " + getDeviceModel();
         String rtt = new Gson().toJson(blusaltTerminalInfo);
-//        init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk");
+//        init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
 //        ProcessTransaction(blusaltTerminalInfo);
         onCompleteTransaction(response);
     }
@@ -2816,12 +2869,12 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     message += getString(R.string.cashback_amount) + ": INR" + cashbackAmount;
                 }
                 messageTextView.setText(message);
-                statusEditText.setText("APPROVED");
+                Log.e("Log TAG", "APPROVED");
 
 //                    deviceShowDisplay("APPROVED");
             } else {
                 messageTextView.setText(getString(R.string.transaction_declined));
-                statusEditText.setText("DECLINED");
+                Log.e("Log TAG", "DECLINED");
 
 //                    deviceShowDisplay("DECLINED");
             }
@@ -2833,7 +2886,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     dismissDialog();
                 }
             });
-            dialog.show();
+            Toast.makeText(getApplicationContext(), messageTextView.getText(), Toast.LENGTH_SHORT).show();
+//            dialog.show();
             amount = "";
             cashbackAmount = "";
         } catch (Exception e) {
@@ -2902,7 +2956,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             Log.e("Tag currencyCode", currencyCode.substring(11, currencyCode.length() - 1));
 
             String countryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F1A"));
-            Log.e("Tag CardNo", countryCode.substring(11, countryCode.length() - 1));
+            Log.e("Tag countryCode", countryCode.substring(11, countryCode.length() - 1));
+
+            String terminalCountryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F28"));
+            Log.e("Tag terminalCountryCode", terminalCountryCode.substring(11, terminalCountryCode.length() - 1));
 
             String AmountAuthorized = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F02"));
             Log.e("Tag AmountAuthorized", AmountAuthorized.substring(11, AmountAuthorized.length() - 1));
@@ -2957,6 +3014,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             String strTrack2 = terminalInfo.track2.split("F")[0];
             String pan = strTrack2.split("D")[0];
             String expiry = strTrack2.split("D")[1].substring(0, 4);
+            Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
+            Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
             Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
 
             terminalInfo.pan = pan;
@@ -3084,7 +3143,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     }
 
     private void clearDisplay() {
-        statusEditText.setText("");
+        Log.e("Log TAG", "");
     }
 
     private String terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
@@ -3094,18 +3153,19 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @SuppressLint("NewApi")
         @Override
         public void onClick(View v) {
-            statusEditText.setText("");
+            Log.e("Log TAG", "");
             if (selectBTFlag) {
-                statusEditText.setText(R.string.wait);
+                Log.e("Log TAG", String.valueOf(R.string.wait));
                 return;
             } else if (v == doTradeButton) {
                 if (pos == null) {
-                    statusEditText.setText(R.string.scan_bt_pos_error);
+                    Log.e("Log TAG", String.valueOf(R.string.scan_bt_pos_error));
                     return;
                 }
                 isPinCanceled = false;
-                statusEditText.setText(R.string.starting);
+                Log.e("Log TAG", String.valueOf(R.string.starting));
                 terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
+
                 if (posType == POS_TYPE.UART) {
                     pos.doTrade(terminalTime, 0, 30);
                 } else {
@@ -3166,7 +3226,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else if (v == btnDisconnect) {
                 close();
             } else if (v == btnQuickEMV) {
-                statusEditText.setText("updating emv config, please wait...");
+                Log.e("Log TAG", "updating emv config, please wait...");
                 updateEmvConfig();
             } else if (v == pollBtn) {
                 pos.pollOnMifareCard(20);
@@ -3291,14 +3351,15 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                    btnQuickEMV.setEnabled(false);
 //                    doTradeButton.setEnabled(false);
 //                    selectBTFlag = true;
+
                     Log.e("TAG", "Connecting Please wait...");
-//                    statusEditText.setText(R.string.connecting_bt_pos);
+//                    Log.e("Log TAG", R.string.connecting_bt_pos);
                     sendMsg(1002);
                     break;
                 case 1002:
                     if (isNormalBlu) {
                         Log.e("TAG", "connectBluetoothDevice " + blueTootchAddress);
-                        if(pos == null) {
+                        if (pos == null) {
                             pos = QPOSService.getInstance(CommunicationMode.BLUETOOTH);
                         }
                         pos.connectBluetoothDevice(true, 25, blueTootchAddress);
@@ -3306,6 +3367,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     } else {
                         pos.connectBLE(blueTootchAddress);
                     }
+
 //                    btnBT.setEnabled(true);
 //                    selectBTFlag = false;
                     Log.e("TAG", "connectBluetoothDevice ");
@@ -3325,7 +3387,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     } else {
                         content = statusEditText.getText().toString() + "\nNFCbatchData: " + nfcLog;
                     }
-                    statusEditText.setText(content);
+                    Log.e("Log TAG", content);
                     break;
                 case 1703:
 //                    int keyIndex = getKeyIndex();
@@ -3345,7 +3407,21 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                        e.printStackTrace();
 //                    }
 //                    pos.updateWorkKey(digEnvelopStr);
-//                    break;
+                    break;
+
+                case 1203:
+
+                    pos_view_update.setText("Insert Card to mPOS");
+
+                    if (posType == POS_TYPE.UART) {
+                        Log.e("TAG", "dotrade");
+                        pos.doTrade(terminalTime, 0, 60);
+                    } else {
+                        Log.e("TAG", "start do trade");
+//                int keyIdex = getKeyIndex();
+                        pos.doTrade(0, 30);//start do trade
+                    }
+                    break;
                 default:
                     break;
             }

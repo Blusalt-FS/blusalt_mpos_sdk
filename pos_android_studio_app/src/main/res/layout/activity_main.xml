@@ -165,9 +165,10 @@
     <TextView
         android:padding="@dimen/fab_margin"
         android:id="@+id/pos_view_update"
+        android:text="hello"
         android:textSize="18sp"
-        android:textColor="@color/white"
-        android:fontFamily="@font/proxima_nova_bold"
+        android:textColor="@color/black"
+        android:fontFamily="@font/gilroy_medium"
         android:gravity="center_horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>

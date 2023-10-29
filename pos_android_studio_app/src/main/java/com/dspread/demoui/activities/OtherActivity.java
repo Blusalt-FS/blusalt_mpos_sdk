@@ -2,6 +2,7 @@ package com.dspread.demoui.activities;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.PendingIntent;
@@ -11,6 +12,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
@@ -31,6 +33,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.Spinner;
@@ -38,11 +41,22 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.dspread.demoui.BaseApplication;
+import com.dspread.demoui.MemoryManager;
 import com.dspread.demoui.R;
 import com.dspread.demoui.USBClass;
+import com.dspread.demoui.blusaltmpos.pay.BlusaltTerminalInfo;
+import com.dspread.demoui.blusaltmpos.pay.CreditCard;
+import com.dspread.demoui.blusaltmpos.pay.TerminalInfo;
+import com.dspread.demoui.blusaltmpos.pay.TerminalResponse;
+import com.dspread.demoui.blusaltmpos.pos.AppLog;
+import com.dspread.demoui.blusaltmpos.pos.TlvDataList;
+import com.dspread.demoui.blusaltmpos.util.Constants;
+import com.dspread.demoui.blusaltmpos.util.KSNUtilities;
 import com.dspread.demoui.keyboard.KeyBoardNumInterface;
 import com.dspread.demoui.keyboard.KeyboardUtil;
 import com.dspread.demoui.keyboard.MyKeyboardView;
+import com.dspread.demoui.network.BaseData;
+import com.dspread.demoui.network.RetrofitClientInstance;
 import com.dspread.demoui.utils.ClickUtil;
 import com.dspread.demoui.utils.DUKPK2009_CBC;
 import com.dspread.demoui.utils.FileUtils;
@@ -51,30 +65,47 @@ import com.dspread.demoui.utils.TRACE;
 import com.dspread.xpos.CQPOSService;
 import com.dspread.xpos.QPOSService;
 import com.dspread.xpos.QPOSService.TransactionType;
+import com.google.gson.Gson;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 
 import Decoder.BASE64Encoder;
+import pl.droidsonroids.gif.GifImageView;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 //import io.sentry.android.core.SentryAndroid;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static com.dspread.demoui.network.APIConstant.ERROR;
+import static com.dspread.demoui.network.APIConstant.incompleteParameters;
+import static com.dspread.demoui.network.APIConstant.initializationError;
 
 public class OtherActivity extends BaseActivity {
 
     private Button doTradeButton, serialBtn, audioBtn;
     private EditText statusEditText;
+
+    private TextView pos_view_update;
+    private ImageView imageViewGif;
     private ListView appListView;
+
+    private String cPin = "";
+    private CreditCard creditCard;
     private Dialog dialog;
     private String nfcLog = "";
     private Button btnUSB;
@@ -106,19 +137,105 @@ public class OtherActivity extends BaseActivity {
     private boolean isUpdateFw = false;
     private boolean isVisiblePosID;
 
+    private String serialNo;
+
+    private Double totalAmount = 0.0;
+    public static Double totalAmountPrint = 0.0;
+    private String accountType;
+    private GifImageView spinKit;
+
+    private String blueTitle = "";
+    private String terminalId;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mContext = this;
+
+        Intent intent = getIntent();
+        if (isSecretKeyAdded()) {
+            if (intent != null) {
+                totalAmount = intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0);
+                accountType = intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE);
+                terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
+                blueTootchAddress = intent.getStringExtra(Constants.BLUETOOTH_ADDRESS);
+                blueTitle = intent.getStringExtra(Constants.BLUETOOTH_TITTLE);
+
+//                totalAmount = 5.00;
+//                blueTootchAddress = "98:27:82:4C:6D:42";
+//                blueTitle = "MPOS2111050246";
+                Log.e("TAG Amount", String.valueOf(totalAmount));
+                Log.e("TAG Amount", Long.toString(totalAmount.longValue()));
+                totalAmountPrint = totalAmount;
+                if (!TextUtils.isEmpty(intent.getStringExtra(Constants.TERMINAL_ID))
+                        && !TextUtils.isEmpty(String.valueOf(intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0)))
+                        && !TextUtils.isEmpty(intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE))
+                ) {
+                    totalAmount = intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0);
+                    accountType = intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE);
+                    terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
+                    totalAmountPrint = totalAmount;
+                } else {
+                    incompleteParameters();
+                }
+            } else {
+                incompleteParameters();
+                return;
+            }
+        } else {
+            initializationError();
+        }
+
         //When the window is visible to the user, keep the device normally open and keep the brightness unchanged
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (!isUart) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         }
-        mContext = this;
         initView();
         initIntent();
         initListener();
+        proceedToPayment();
+    }
+
+    private void proceedToPayment() {
+
+        USBClass usb = new USBClass();
+        ArrayList<String> deviceList = usb.GetUSBDevices(getBaseContext());
+        if (deviceList == null) {
+            Toast.makeText(mContext, "No Permission", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final CharSequence[] items = deviceList.toArray(new CharSequence[deviceList.size()]);
+        AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+        builder.setTitle("Select a Reader");
+        builder.setSingleChoiceItems(items, -1, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int item) {
+                String selectedDevice = (String) items[item];
+                dialog.dismiss();
+                usbDevice = USBClass.getMdevices().get(selectedDevice);
+                open(QPOSService.CommunicationMode.USB_OTG_CDC_ACM);
+                posType = POS_TYPE.OTG;
+                pos.openUsb(usbDevice);
+            }
+        });
+        AlertDialog alert = builder.create();
+        alert.show();
+
+    }
+        private Boolean isSecretKeyAdded() {
+        return MemoryManager.getInstance(getApplicationContext()).isSecretActivated();
+    }
+
+    public static void init(String secretKey, Context context) {
+        if (!TextUtils.isEmpty(secretKey)) {
+            try {
+                MemoryManager.getInstance(context).putUserSecretKey(secretKey);
+            } catch (Exception e) {
+                AppLog.e("prepareForPrinter", e.getMessage());
+            }
+        } else {
+            AppLog.e("init", "Secret Key is Empty");
+        }
     }
 
     @Override
@@ -133,7 +250,7 @@ public class OtherActivity extends BaseActivity {
 
     private void initIntent() {
         Intent intent = getIntent();
-        type = intent.getIntExtra("connect_type", 0);
+        type = intent.getIntExtra("connect_type", 2);
         switch (type) {
             case 1:
                 setTitle(getString(R.string.title_audio));
@@ -184,6 +301,13 @@ public class OtherActivity extends BaseActivity {
     }
 
     private void initView() {
+
+        spinKit = findViewById(R.id.imageViewGif);
+        spinKit.setImageResource(R.drawable.card);
+
+        pos_view_update = ((TextView) findViewById(R.id.pos_view_update));
+        imageViewGif = ((ImageView) findViewById(R.id.imageViewGif));
+
         doTradeButton = (Button) findViewById(R.id.doTradeButton);//start to do trade
         serialBtn = (Button) findViewById(R.id.serialPort);
         audioBtn = (Button) findViewById(R.id.audioButton);
@@ -972,7 +1096,9 @@ public class OtherActivity extends BaseActivity {
                     dismissDialog();
                 }
             });
-            dialog.show();
+
+            Toast.makeText(getApplicationContext(), messageTextView.getText(), Toast.LENGTH_SHORT).show();
+//            dialog.show();
             amount = "";
             cashbackAmount = "";
         }
@@ -1000,6 +1126,7 @@ public class OtherActivity extends BaseActivity {
         public void onQposIdResult(Hashtable<String, String> posIdTable) {
             TRACE.w("onQposIdResult():" + posIdTable.toString());
             String posId = posIdTable.get("posId") == null ? "" : posIdTable.get("posId");
+            serialNo = posId;
             String csn = posIdTable.get("csn") == null ? "" : posIdTable.get("csn");
             String psamId = posIdTable.get("psamId") == null ? "" : posIdTable
                     .get("psamId");
@@ -1017,6 +1144,21 @@ public class OtherActivity extends BaseActivity {
                 isVisiblePosID = false;
 //                BaseApplication.setmPosID(posId);
             }
+
+            Log.e("TAG", "Starting");
+            isPinCanceled = false;
+            statusEditText.setText(R.string.starting);
+//                terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
+            if (posType == POS_TYPE.UART) {//postype is UART
+                pos.setCardTradeMode(QPOSService.CardTradeMode.SWIPE_TAP_INSERT_CARD_NOTUP);
+//                    pos.doTrade(terminalTime, 0, 30);
+                pos.doTrade(20);
+            } else {
+                int keyIdex = getKeyIndex();
+//                    pos.setCardTradeMode(QPOSService.CardTradeMode.SWIPE_TAP_INSERT_CARD_NOTUP);
+                pos.doTrade(keyIdex, 30);//start do trade
+            }
+
         }
 
         @Override
@@ -1057,85 +1199,89 @@ public class OtherActivity extends BaseActivity {
         public void onRequestSetAmount() {
             TRACE.d("enter amount -- start");
             TRACE.d("onRequestSetAmount()");
-            dismissDialog();
-            dialog = new Dialog(mContext);
-            dialog.setContentView(R.layout.amount_dialog);
-            dialog.setTitle(getString(R.string.set_amount));
-            String[] transactionTypes = new String[]{"GOODS", "SERVICES", "CASH", "CASHBACK", "INQUIRY",
-                    "TRANSFER", "ADMIN", "CASHDEPOSIT",
-                    "PAYMENT", "PBOCLOG||ECQ_INQUIRE_LOG", "SALE",
-                    "PREAUTH", "ECQ_DESIGNATED_LOAD", "ECQ_UNDESIGNATED_LOAD",
-                    "ECQ_CASH_LOAD", "ECQ_CASH_LOAD_VOID", "CHANGE_PIN", "REFOUND", "SALES_NEW"};
-            ((Spinner) dialog.findViewById(R.id.transactionTypeSpinner)).setAdapter(new ArrayAdapter<String>(mContext, android.R.layout.simple_spinner_item,
-                    transactionTypes));
+            Log.e("TAG", "onRequestSetAmount()" + totalAmount);
+            Log.e("TAG", "onRequestSetAmount()" + Long.toString(totalAmount.longValue()));
+            pos.setAmount(totalAmount.longValue() + "00", cashbackAmount, "566", TransactionType.GOODS);
 
-            dialog.findViewById(R.id.setButton).setOnClickListener(new View.OnClickListener() {
-
-                @Override
-                public void onClick(View v) {
-
-                    String amount = ((EditText) (dialog.findViewById(R.id.amountEditText))).getText().toString();
-                    String cashbackAmount = ((EditText) (dialog.findViewById(R.id.cashbackAmountEditText))).getText().toString();
-                    String transactionTypeString = (String) ((Spinner) dialog.findViewById(R.id.transactionTypeSpinner)).getSelectedItem();
-
-                    TransactionType transactionType = null;
-                    if (transactionTypeString.equals("GOODS")) {
-                        transactionType = QPOSService.TransactionType.GOODS;
-                    } else if (transactionTypeString.equals("SERVICES")) {
-                        transactionType = QPOSService.TransactionType.SERVICES;
-                    } else if (transactionTypeString.equals("CASH")) {
-                        transactionType = QPOSService.TransactionType.CASH;
-                    } else if (transactionTypeString.equals("CASHBACK")) {
-                        transactionType = QPOSService.TransactionType.CASHBACK;
-                    } else if (transactionTypeString.equals("INQUIRY")) {
-                        transactionType = QPOSService.TransactionType.INQUIRY;
-                    } else if (transactionTypeString.equals("TRANSFER")) {
-                        transactionType = QPOSService.TransactionType.TRANSFER;
-                    } else if (transactionTypeString.equals("ADMIN")) {
-                        transactionType = QPOSService.TransactionType.ADMIN;
-                    } else if (transactionTypeString.equals("CASHDEPOSIT")) {
-                        transactionType = QPOSService.TransactionType.CASHDEPOSIT;
-                    } else if (transactionTypeString.equals("PAYMENT")) {
-                        transactionType = QPOSService.TransactionType.PAYMENT;
-                    } else if (transactionTypeString.equals("PBOCLOG||ECQ_INQUIRE_LOG")) {
-                        transactionType = QPOSService.TransactionType.PBOCLOG;
-                    } else if (transactionTypeString.equals("SALE")) {
-                        transactionType = QPOSService.TransactionType.SALE;
-                    } else if (transactionTypeString.equals("PREAUTH")) {
-                        transactionType = QPOSService.TransactionType.PREAUTH;
-                    } else if (transactionTypeString.equals("ECQ_DESIGNATED_LOAD")) {
-                        transactionType = QPOSService.TransactionType.ECQ_DESIGNATED_LOAD;
-                    } else if (transactionTypeString.equals("ECQ_UNDESIGNATED_LOAD")) {
-                        transactionType = QPOSService.TransactionType.ECQ_UNDESIGNATED_LOAD;
-                    } else if (transactionTypeString.equals("ECQ_CASH_LOAD")) {
-                        transactionType = QPOSService.TransactionType.ECQ_CASH_LOAD;
-                    } else if (transactionTypeString.equals("ECQ_CASH_LOAD_VOID")) {
-                        transactionType = QPOSService.TransactionType.ECQ_CASH_LOAD_VOID;
-                    } else if (transactionTypeString.equals("CHANGE_PIN")) {
-                        transactionType = QPOSService.TransactionType.UPDATE_PIN;
-                    } else if (transactionTypeString.equals("REFOUND")) {
-                        transactionType = QPOSService.TransactionType.REFUND;
-                    } else if (transactionTypeString.equals("SALES_NEW")) {
-                        transactionType = QPOSService.TransactionType.SALES_NEW;
-                    }
-                    OtherActivity.this.amount = amount;
-                    OtherActivity.this.cashbackAmount = cashbackAmount;
-                    pos.setAmount(amount, cashbackAmount, "156", transactionType);
-                    TRACE.d("enter amount  -- end");
-                    dismissDialog();
-                }
-            });
-
-            dialog.findViewById(R.id.cancelButton).setOnClickListener(new View.OnClickListener() {
-
-                @Override
-                public void onClick(View v) {
-                    pos.cancelSetAmount();
-                    dialog.dismiss();
-                }
-            });
-            dialog.setCanceledOnTouchOutside(false);
-            dialog.show();
+//            dismissDialog();
+//            dialog = new Dialog(mContext);
+//            dialog.setContentView(R.layout.amount_dialog);
+//            dialog.setTitle(getString(R.string.set_amount));
+//            String[] transactionTypes = new String[]{"GOODS", "SERVICES", "CASH", "CASHBACK", "INQUIRY",
+//                    "TRANSFER", "ADMIN", "CASHDEPOSIT",
+//                    "PAYMENT", "PBOCLOG||ECQ_INQUIRE_LOG", "SALE",
+//                    "PREAUTH", "ECQ_DESIGNATED_LOAD", "ECQ_UNDESIGNATED_LOAD",
+//                    "ECQ_CASH_LOAD", "ECQ_CASH_LOAD_VOID", "CHANGE_PIN", "REFOUND", "SALES_NEW"};
+//            ((Spinner) dialog.findViewById(R.id.transactionTypeSpinner)).setAdapter(new ArrayAdapter<String>(mContext, android.R.layout.simple_spinner_item,
+//                    transactionTypes));
+//
+//            dialog.findViewById(R.id.setButton).setOnClickListener(new View.OnClickListener() {
+//
+//                @Override
+//                public void onClick(View v) {
+//
+//                    String amount = ((EditText) (dialog.findViewById(R.id.amountEditText))).getText().toString();
+//                    String cashbackAmount = ((EditText) (dialog.findViewById(R.id.cashbackAmountEditText))).getText().toString();
+//                    String transactionTypeString = (String) ((Spinner) dialog.findViewById(R.id.transactionTypeSpinner)).getSelectedItem();
+//
+//                    TransactionType transactionType = null;
+//                    if (transactionTypeString.equals("GOODS")) {
+//                        transactionType = QPOSService.TransactionType.GOODS;
+//                    } else if (transactionTypeString.equals("SERVICES")) {
+//                        transactionType = QPOSService.TransactionType.SERVICES;
+//                    } else if (transactionTypeString.equals("CASH")) {
+//                        transactionType = QPOSService.TransactionType.CASH;
+//                    } else if (transactionTypeString.equals("CASHBACK")) {
+//                        transactionType = QPOSService.TransactionType.CASHBACK;
+//                    } else if (transactionTypeString.equals("INQUIRY")) {
+//                        transactionType = QPOSService.TransactionType.INQUIRY;
+//                    } else if (transactionTypeString.equals("TRANSFER")) {
+//                        transactionType = QPOSService.TransactionType.TRANSFER;
+//                    } else if (transactionTypeString.equals("ADMIN")) {
+//                        transactionType = QPOSService.TransactionType.ADMIN;
+//                    } else if (transactionTypeString.equals("CASHDEPOSIT")) {
+//                        transactionType = QPOSService.TransactionType.CASHDEPOSIT;
+//                    } else if (transactionTypeString.equals("PAYMENT")) {
+//                        transactionType = QPOSService.TransactionType.PAYMENT;
+//                    } else if (transactionTypeString.equals("PBOCLOG||ECQ_INQUIRE_LOG")) {
+//                        transactionType = QPOSService.TransactionType.PBOCLOG;
+//                    } else if (transactionTypeString.equals("SALE")) {
+//                        transactionType = QPOSService.TransactionType.SALE;
+//                    } else if (transactionTypeString.equals("PREAUTH")) {
+//                        transactionType = QPOSService.TransactionType.PREAUTH;
+//                    } else if (transactionTypeString.equals("ECQ_DESIGNATED_LOAD")) {
+//                        transactionType = QPOSService.TransactionType.ECQ_DESIGNATED_LOAD;
+//                    } else if (transactionTypeString.equals("ECQ_UNDESIGNATED_LOAD")) {
+//                        transactionType = QPOSService.TransactionType.ECQ_UNDESIGNATED_LOAD;
+//                    } else if (transactionTypeString.equals("ECQ_CASH_LOAD")) {
+//                        transactionType = QPOSService.TransactionType.ECQ_CASH_LOAD;
+//                    } else if (transactionTypeString.equals("ECQ_CASH_LOAD_VOID")) {
+//                        transactionType = QPOSService.TransactionType.ECQ_CASH_LOAD_VOID;
+//                    } else if (transactionTypeString.equals("CHANGE_PIN")) {
+//                        transactionType = QPOSService.TransactionType.UPDATE_PIN;
+//                    } else if (transactionTypeString.equals("REFOUND")) {
+//                        transactionType = QPOSService.TransactionType.REFUND;
+//                    } else if (transactionTypeString.equals("SALES_NEW")) {
+//                        transactionType = QPOSService.TransactionType.SALES_NEW;
+//                    }
+//                    OtherActivity.this.amount = amount;
+//                    OtherActivity.this.cashbackAmount = cashbackAmount;
+//                    pos.setAmount(amount, cashbackAmount, "156", transactionType);
+//                    TRACE.d("enter amount  -- end");
+//                    dismissDialog();
+//                }
+//            });
+//
+//            dialog.findViewById(R.id.cancelButton).setOnClickListener(new View.OnClickListener() {
+//
+//                @Override
+//                public void onClick(View v) {
+//                    pos.cancelSetAmount();
+//                    dialog.dismiss();
+//                }
+//            });
+//            dialog.setCanceledOnTouchOutside(false);
+//            dialog.show();
 //            pos.setAmount("200", cashbackAmount, "156", QPOSService.TransactionType.GOODS);
         }
 
@@ -1160,41 +1306,78 @@ public class OtherActivity extends BaseActivity {
             Hashtable<String, String> decodeData = pos.anlysEmvIccData(tlv);
             TRACE.d("anlysEmvIccData(tlv):" + decodeData.toString());
 
-            if (isPinCanceled) {
-                ((TextView) dialog.findViewById(R.id.messageTextView))
-                        .setText(R.string.replied_failed);
-            } else {
-                ((TextView) dialog.findViewById(R.id.messageTextView))
-                        .setText(R.string.replied_success);
-            }
+            String track2 = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "57"));
+            Log.e("Tag track2", track2.substring(5, track2.length() - 1));
+
+            String cardNo = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5A"));
+            Log.e("Tag CardNo", cardNo.substring(5, cardNo.length() - 1));
+
+            String expiryDate = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F24"));
+            Log.e("Tag expiryDate", expiryDate.substring(5, expiryDate.length() - 1));
+
+            String currencyCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F2A"));
+            Log.e("Tag currencyCode", currencyCode.substring(5, currencyCode.length() - 1));
+
+            String countryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F1A"));
+            Log.e("Tag countryCode", countryCode.substring(5, countryCode.length() - 1));
+
+            String terminalCountryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F28"));
+            Log.e("Tag terminalCountryCode", terminalCountryCode.substring(5, terminalCountryCode.length() - 1));
+
+            creditCard.setCardNumber(cardNo);
+            creditCard.setExpireDate(expiryDate);
+
+//            if (isPinCanceled) {
+//                ((TextView) dialog.findViewById(R.id.messageTextView))
+//                        .setText(R.string.replied_failed);
+//            } else {
+//                ((TextView) dialog.findViewById(R.id.messageTextView))
+//                        .setText(R.string.replied_success);
+//            }
             try {
 //                    analyData(tlv);// analy tlv ,get the tag you need
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
-
-            dialog.findViewById(R.id.confirmButton).setOnClickListener(
-                    new View.OnClickListener() {
-
-                        @Override
-                        public void onClick(View v) {
-                            if (isPinCanceled) {
-                                pos.sendOnlineProcessResult(null);
-                            } else {
+            if (isPinCanceled) {
+                pos.sendOnlineProcessResult(null);
+            } else {
 //									String str = "5A0A6214672500000000056F5F24032307315F25031307085F2A0201565F34010182027C008407A00000033301018E0C000000000000000002031F009505088004E0009A031406179C01009F02060000000000019F03060000000000009F0702AB009F080200209F0902008C9F0D05D86004A8009F0E0500109800009F0F05D86804F8009F101307010103A02000010A010000000000CE0BCE899F1A0201569F1E0838333230314943439F21031826509F2608881E2E4151E527899F2701809F3303E0F8C89F34030203009F3501229F3602008E9F37042120A7189F4104000000015A0A6214672500000000056F5F24032307315F25031307085F2A0201565F34010182027C008407A00000033301018E0C000000000000000002031F00";
 //									str = "9F26088930C9018CAEBCD69F2701809F101307010103A02802010A0100000000007EF350299F370415B4E5829F360202179505000004E0009A031504169C01009F02060000000010005F2A02015682027C009F1A0201569F03060000000000009F330360D8C89F34030203009F3501229F1E0838333230314943438408A0000003330101019F090200209F410400000001";
-                                String str = "8A023030";//Currently the default value,
-                                // should be assigned to the server to return data,
-                                // the data format is TLV
-                                pos.sendOnlineProcessResult(str);//Script notification/55domain/ICCDATA
+                String str = "8A023030";//Currently the default value,
+                // should be assigned to the server to return data,
+                // the data format is TLV
+//                                pos.sendOnlineProcessResult(str);//Script notification/55domain/ICCDATA
 
-                            }
-                            dismissDialog();
-                        }
-                    });
+                Log.e("Check", "Process Trans");
+                proceedToExChangeData("00", creditCard);
+            }
 
-            dialog.show();
+
+//            dialog.findViewById(R.id.confirmButton).setOnClickListener(
+//                    new View.OnClickListener() {
+//
+//                        @Override
+//                        public void onClick(View v) {
+//                            if (isPinCanceled) {onQposIdResult
+//                                pos.sendOnlineProcessResult(null);
+//                            } else {
+////									String str = "5A0A6214672500000000056F5F24032307315F25031307085F2A0201565F34010182027C008407A00000033301018E0C000000000000000002031F009505088004E0009A031406179C01009F02060000000000019F03060000000000009F0702AB009F080200209F0902008C9F0D05D86004A8009F0E0500109800009F0F05D86804F8009F101307010103A02000010A010000000000CE0BCE899F1A0201569F1E0838333230314943439F21031826509F2608881E2E4151E527899F2701809F3303E0F8C89F34030203009F3501229F3602008E9F37042120A7189F4104000000015A0A6214672500000000056F5F24032307315F25031307085F2A0201565F34010182027C008407A00000033301018E0C000000000000000002031F00";
+////									str = "9F26088930C9018CAEBCD69F2701809F101307010103A02802010A0100000000007EF350299F370415B4E5829F360202179505000004E0009A031504169C01009F02060000000010005F2A02015682027C009F1A0201569F03060000000000009F330360D8C89F34030203009F3501229F1E0838333230314943438408A0000003330101019F090200209F410400000001";
+//                                String str = "8A023030";//Currently the default value,
+//                                // should be assigned to the server to return data,
+//                                // the data format is TLV
+////                                pos.sendOnlineProcessResult(str);//Script notification/55domain/ICCDATA
+//
+//                                Log.e("Check", "Process Trans");
+//                                proceedToExChangeData("00", creditCard);
+//                            }
+//                            dismissDialog();
+//                        }
+//                    });
+
+//            dialog.show();
         }
 
         @Override
@@ -1293,11 +1476,11 @@ public class OtherActivity extends BaseActivity {
         @Override
         public void onRequestQposConnected() {
             TRACE.d("onRequestQposConnected()");
-            Toast.makeText(mContext, "onRequestQposConnected", Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, "Mpos Connected", Toast.LENGTH_LONG).show();
             dismissDialog();
             statusEditText.setText(getString(R.string.device_plugged));
-            doTradeButton.setEnabled(true);
-            btnDisconnect.setEnabled(true);
+//            doTradeButton.setEnabled(true);
+//            btnDisconnect.setEnabled(true);
             if (ActivityCompat.checkSelfPermission(OtherActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PERMISSION_GRANTED) {
                 //申请权限
@@ -1305,6 +1488,11 @@ public class OtherActivity extends BaseActivity {
             }
             pos.getQposId();
             isVisiblePosID = true;
+
+            pos_view_update.setText("Insert Card to mPOS");
+            pos_view_update.setVisibility(View.VISIBLE);
+            spinKit.setVisibility(View.VISIBLE);
+            doTradeButton.setVisibility(View.INVISIBLE);
         }
 
         @Override
@@ -1320,8 +1508,8 @@ public class OtherActivity extends BaseActivity {
                 }
             }
 
-            btnDisconnect.setEnabled(false);
-            doTradeButton.setEnabled(false);
+//            btnDisconnect.setEnabled(false);
+//            doTradeButton.setEnabled(false);
         }
 
         @Override
@@ -1369,7 +1557,8 @@ public class OtherActivity extends BaseActivity {
                     return;
                 }
                 pos.resetPosStatus();
-                statusEditText.setText(getString(R.string.device_reset));
+                Log.e("TAG POS", getString(R.string.device_reset));
+                Toast.makeText(getApplicationContext(), R.string.device_reset, Toast.LENGTH_LONG).show();
             }
         }
 
@@ -1479,8 +1668,10 @@ public class OtherActivity extends BaseActivity {
         @Override
         public void onRequestSetPin() {
             TRACE.d("onRequestSetPin()");
+            creditCard = new CreditCard();
+
             dismissDialog();
-            dialog = new Dialog(mContext);
+            dialog = new Dialog(mContext, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
             dialog.setContentView(R.layout.pin_dialog);
             dialog.setTitle(getString(R.string.enter_pin));
             dialog.findViewById(R.id.confirmButton).setOnClickListener(new View.OnClickListener() {
@@ -1489,27 +1680,33 @@ public class OtherActivity extends BaseActivity {
                 public void onClick(View v) {
                     String pin = ((EditText) dialog.findViewById(R.id.pinEditText)).getText().toString();
                     if (pin.length() >= 4 && pin.length() <= 12) {
-                        if (pin.equals("000000")) {
-                            pos.sendEncryptPin("5516422217375116");
 
-                        } else {
-                            pos.sendPin(pin);
-                        }
-                        dismissDialog();
+                        pos_view_update.setText("Processing Transaction");
+                        cPin = pin;
+                        creditCard.setPIN(pin);
+                        pos.sendPin(pin);
+
+//                        if (pin.equals("000000")) {
+//                            pos.sendEncryptPin("5516422217375116");
+//
+//                        } else {
+//                            pos.sendPin(pin);
+//                        }
+//                        dismissDialog();
                     }
                 }
             });
 
-            dialog.findViewById(R.id.bypassButton).setOnClickListener(new View.OnClickListener() {
-
-                @Override
-                public void onClick(View v) {
-//					pos.bypassPin();
-                    pos.sendPin("");
-
-                    dismissDialog();
-                }
-            });
+//            dialog.findViewById(R.id.bypassButton).setOnClickListener(new View.OnClickListener() {
+//
+//                @Override
+//                public void onClick(View v) {
+////					pos.bypassPin();
+//                    pos.sendPin("");
+//
+//                    dismissDialog();
+//                }
+//            });
 
             dialog.findViewById(R.id.cancelButton).setOnClickListener(new View.OnClickListener() {
 
@@ -2282,6 +2479,373 @@ public class OtherActivity extends BaseActivity {
 
     }
 
+
+    private String ksn;
+    private void proceedToExChangeData(String responseCode, CreditCard creditCard) {
+//        if (creditCard.getPIN() == null) {
+//            Log.e("FailedTransaction ", "FailedTransaction");
+////            FailedTransaction();
+//            return;
+//        }
+        TerminalInfo response = showTerminalEmvTransResult(cPin, responseCode, getDeviceMac());
+        KSNUtilities ksnUtilitites = new KSNUtilities();
+        //  String workingKey = ksnUtilitites.getWorkingKey("3F2216D8297BCE9C", "000002DDDDE00002");
+
+
+        String workingKey = ksnUtilitites.getWorkingKey("3F2216D8297BCE9C", getInitialKSN());
+        String pinBlock = ksnUtilitites.DesEncryptDukpt(workingKey, response.pan, cPin);
+
+        ksn = ksnUtilitites.getLatestKsn();
+
+        response.ksn = ksn;
+        response.pinBlock = pinBlock;
+        response.terminalId = "2076NA61";
+//        response.terminalId = terminalId;
+        // response.cardOwner = creditCard.getHolderName();
+        stopEmvProcess(response);
+    }
+
+    private String getInitialKSN() {
+        SharedPreferences sharedPref = getSharedPreferences("KSNCOUNTER", Context.MODE_PRIVATE);
+        int ksn = sharedPref.getInt("KSN", 00001);
+        if (ksn > 9999) {
+            ksn = 00000;
+        }
+        int latestKSN = ksn + 1;
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putInt("KSN", latestKSN);
+        editor.apply();
+        return "0000000002DDDDE" + String.format("%05d", latestKSN);
+    }
+
+    private void stopEmvProcess(TerminalInfo response) {
+        AppLog.d("Processing", "Transaction" + "Please wait");
+        Log.e("Processing", "Processing Transaction....");
+        String mTerminal = new Gson().toJson(response);
+        BlusaltTerminalInfo blusaltTerminalInfo = new Gson().fromJson(mTerminal, BlusaltTerminalInfo.class);
+        blusaltTerminalInfo.deviceOs = "Android";
+        blusaltTerminalInfo.serialNumber = getDeviceMac();
+        blusaltTerminalInfo.device = "MPOS " + getDeviceModel();
+        blusaltTerminalInfo.currency = "NGN";
+        blusaltTerminalInfo.currencyCode = "566";
+        response.currencyCode = "566";
+        response.currency = "NGN";
+        response.deviceOs = "Android";
+        response.serialNumber = getDeviceMac();
+        response.device = "Mpos " + getDeviceModel();
+        String rtt = new Gson().toJson(blusaltTerminalInfo);
+//        init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
+//        ProcessTransaction(blusaltTerminalInfo);
+        onCompleteTransaction(response);
+    }
+
+    private void ProcessTransaction(BlusaltTerminalInfo blusaltTerminalInfo) {
+        RetrofitClientInstance.getInstance().getDataService().postTransactionToMiddleWare(blusaltTerminalInfo).enqueue(new Callback<BaseData<TerminalResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<BaseData<TerminalResponse>> call, @NonNull Response<BaseData<TerminalResponse>> response) {
+                AppLog.d("ProcessTransaction", "ProcessTransaction" + response.body());
+                AppLog.d("ProcessTransaction", "ProcessTransaction" + response);
+                TerminalResponse terminalResponse = new TerminalResponse("card payment failed", "01", "Unable to process transaction");
+                if (response.isSuccessful()) {
+                    Log.e("ProcessTransaction", "ProcessTransaction success" + new Gson().toJson(terminalResponse));
+
+                    if (response.body().getMessage().contains("Access denied! invalid apiKey passed")) {
+                        terminalResponse.responseCode = "01";
+                        terminalResponse.responseDescription = "card payment failed";
+                        apiResponseCall(terminalResponse);
+                    } else {
+                        terminalResponse = Objects.requireNonNull(response.body()).getData();
+//                        terminalResponse.responseCode = "00";
+//                        terminalResponse.responseDescription = "card payment successful";
+                        Log.e("ProcessTransaction", "ProcessTransaction success" + new Gson().toJson(terminalResponse));
+
+                        terminalResponse.responseCode = "00";
+                        terminalResponse.responseDescription = "card payment successful";
+                        terminalResponse.message = "card payment successful";
+
+                        apiResponseCall(terminalResponse);
+                    }
+                } else {
+                    try {
+//                        Gson gson = new Gson();
+//                        Type type = new TypeToken<TerminalResponse>() {}.getType();
+//
+//                        terminalResponse = gson.fromJson(response.errorBody().charStream(), type);
+                        Log.e("ProcessTransaction", "ProcessTransaction err" + new Gson().toJson(terminalResponse));
+
+                        terminalResponse.status = false;
+                        terminalResponse.responseCode = "01";
+                        terminalResponse.responseDescription = "card payment failed";
+                        terminalResponse.message = "card payment failed";
+
+
+                        apiResponseCall(terminalResponse);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Log.e("ProcessTransaction", "ProcessTransaction err" + e.getMessage());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<BaseData<TerminalResponse>> call, @NonNull Throwable t) {
+                TerminalResponse terminalResponse = new TerminalResponse();
+                Log.e("ProcessTransaction", "ProcessTransaction onFailure" + t.getMessage());
+                Log.e("ProcessTransaction", "ProcessTransaction onFailure" + new Gson().toJson(terminalResponse));
+                terminalResponse.status = false;
+                terminalResponse.message = t.getMessage();
+                terminalResponse.responseCode = "02";
+                terminalResponse.responseDescription = "Unable to connect to the server";
+                apiResponseCall(terminalResponse);
+            }
+        });
+    }
+
+    public void apiResponseCall(TerminalResponse terminalResponse) {
+        try {
+
+            dismissDialog();
+            dialog = new Dialog(OtherActivity.this);
+            dialog.setContentView(R.layout.alert_dialog);
+            dialog.setTitle(R.string.transaction_result);
+            TextView messageTextView = (TextView) dialog.findViewById(R.id.messageTextView);
+
+            TRACE.d("onRequestTransactionResult()" + terminalResponse.message.toString());
+            TRACE.d("onRequestTransactionResult()" + terminalResponse.responseCode.toString());
+
+            if (Objects.equals(terminalResponse.responseCode, "00")) {
+                TRACE.d("TransactionResult.APPROVED");
+                String message = getString(R.string.transaction_approved) + "\n" + getString(R.string.amount) + ": N" + amount + "\n";
+                if (!cashbackAmount.equals("")) {
+                    message += getString(R.string.cashback_amount) + ": INR" + cashbackAmount;
+                }
+                messageTextView.setText(message);
+                Log.e("Log TAG", "APPROVED");
+
+//                    deviceShowDisplay("APPROVED");
+            } else {
+                messageTextView.setText(getString(R.string.transaction_declined));
+                Log.e("Log TAG", "DECLINED");
+
+//                    deviceShowDisplay("DECLINED");
+            }
+
+            dialog.findViewById(R.id.confirmButton).setOnClickListener(new View.OnClickListener() {
+
+                @Override
+                public void onClick(View v) {
+                    dismissDialog();
+                }
+            });
+            Toast.makeText(getApplicationContext(), messageTextView.getText(), Toast.LENGTH_SHORT).show();
+//            dialog.show();
+            amount = "";
+            cashbackAmount = "";
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+//        Intent intent = new Intent();
+//        String fullPay = new Gson().toJson(terminalResponse);
+//        intent.putExtra(getString(com.blusalt.blusaltmpos.R.string.data), fullPay);
+//        // prepareForPrinters(PosActivity.this,terminalResponse);
+//        finishTransaction(intent);
+    }
+
+    public String getDeviceMac() {
+        try {
+            String devInfo = serialNo;
+            return devInfo;
+        } catch (Exception e) {
+            Log.e("getDeviceMac", e.getLocalizedMessage());
+        }
+        return "";
+    }
+
+    public static String getDeviceModel() {
+        try {
+            String devInfo = "CR100";
+            return devInfo;
+        } catch (Exception e) {
+            Log.e("getDeviceMac", e.getLocalizedMessage());
+        }
+        return "";
+    }
+
+    public void onCompleteTransaction(TerminalInfo response) {
+        try {
+            String fullPay = new Gson().toJson(response);
+            Log.e("TRANS DONE", new Gson().toJson(response));
+            Intent intent = new Intent();
+            //intent.putExtra(getString(R.string.data), response);
+            intent.putExtra(getString(R.string.data), fullPay);
+            setResult(Activity.RESULT_OK, intent);
+            finish();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static TerminalInfo getDefaultTerminalInfo() {
+        TerminalInfo terminalInfo = new TerminalInfo();
+        terminalInfo.batteryInformation = "100";
+        terminalInfo.languageInfo = "EN";
+        terminalInfo.posConditionCode = "00";
+        terminalInfo.printerStatus = "1";
+        //  terminalInfo.minorAmount = "000000000001";
+        terminalInfo.TransactionType = "00";
+        terminalInfo.posEntryMode = "051";
+        terminalInfo.posDataCode = "510101511344101";
+        terminalInfo.posGeoCode = "00234000000000566";
+        terminalInfo.pinType = "Dukpt";
+        terminalInfo.stan = getNextStan();
+        terminalInfo.AmountOther = "000000000000";
+        terminalInfo.TransactionCurrencyCode = "0566";
+        terminalInfo.TerminalCountryCode = "566";
+        terminalInfo.TerminalType = "22";
+        return terminalInfo;
+    }
+
+    public static String getNextStan() {
+        SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
+        return df.format(new Date()).substring(8);
+    }
+
+    public TerminalInfo showTerminalEmvTransResult(String _PinBlock, String _responseCode, String deviceMacAddress) {
+        TerminalInfo terminalInfo = getDefaultTerminalInfo();
+        terminalInfo.fromAccount = "Default";// getAccountTypeString(accountType);
+        terminalInfo.responseCode = _responseCode;
+        terminalInfo.responseDescription = "Data collected successfully";
+        terminalInfo.TerminalName = "mpos";
+        TlvDataList tlvDataList = null;
+        String tlv = null;
+        try {
+//            tlv = DeviceHelper.getEmvHandler().getTlvByTags(EmvUtil.tags);
+//            tlvDataList = TlvDataList.fromBinary(tlv);
+//            if (tlvDataList.getTLV(EmvTags.EMV_TAG_IC_CHNAME) != null) {
+//                String name = EmvUtil.readCardHolder();
+//                terminalInfo.cardOwner =  ConvertUtils.formatHexString(name);
+//            } else {
+//                terminalInfo.cardOwner = "CUSTOMER / INSTANT";
+//            }
+
+            String track2 = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "57"));
+            Log.e("Tag track2", track2.substring(9, track2.length() - 1));
+
+            String cardNo = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5A"));
+            Log.e("Tag CardNo", cardNo.substring(9, cardNo.length() - 1));
+
+            String expiryDate = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F24"));
+            Log.e("Tag expiryDate", expiryDate.substring(11, expiryDate.length() - 1));
+
+            String currencyCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F2A"));
+            Log.e("Tag currencyCode", currencyCode.substring(11, currencyCode.length() - 1));
+
+            String countryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F1A"));
+            Log.e("Tag countryCode", countryCode.substring(11, countryCode.length() - 1));
+
+            String terminalCountryCode = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F28"));
+            Log.e("Tag terminalCountryCode", terminalCountryCode.substring(11, terminalCountryCode.length() - 1));
+
+            String AmountAuthorized = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F02"));
+            Log.e("Tag AmountAuthorized", AmountAuthorized.substring(11, AmountAuthorized.length() - 1));
+
+            String UnpredictableNumber = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F37"));
+            Log.e("Tag UnpredictableNumber", UnpredictableNumber.substring(11, UnpredictableNumber.length() - 1));
+
+            String iad = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F10"));
+            Log.e("Tag iad", iad.substring(11, iad.length() - 1));
+
+            String atc = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F36"));
+            Log.e("Tag atc", atc.substring(11, atc.length() - 1));
+
+            String cardSequenceNumber = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "5F34"));
+            Log.e("Tag cardSequenceNumber", cardSequenceNumber.substring(11, cardSequenceNumber.length() - 1));
+
+            String TerminalCapabilities = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F33"));
+            Log.e("TerminalCapabilities", TerminalCapabilities.substring(11, TerminalCapabilities.length() - 1));
+
+            String Cryptogram = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F26"));
+            Log.e("Tag Cryptogram", Cryptogram.substring(11, Cryptogram.length() - 1));
+
+            String TransactionDate = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9A"));
+            Log.e("Tag TransactionDate", TransactionDate.substring(9, TransactionDate.length() - 1));
+
+            String TerminalVerificationResult = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "95"));
+            Log.e("TerminalVerificationResult", TerminalVerificationResult.substring(9, TerminalVerificationResult.length() - 1));
+
+            String ApplicationInterchangeProfile = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "82"));
+            Log.e("ApplicationInterchangeProfile", ApplicationInterchangeProfile.substring(9, ApplicationInterchangeProfile.length() - 1));
+
+            String CvmResults = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "9F34"));
+            Log.e("Tag CvmResults", CvmResults.substring(11, CvmResults.length() - 1));
+
+            String DedicatedFileName = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "84"));
+            Log.e("Tag DedicatedFileName", DedicatedFileName.substring(9, DedicatedFileName.length() - 1));
+
+            terminalInfo.cardOwner = "CUSTOMER / INSTANT";
+            Log.d(TAG, "ICC Data: " + "\n" + tlv);
+            terminalInfo.DedicatedFileName = DedicatedFileName.substring(9, DedicatedFileName.length() - 1);
+            terminalInfo.CvmResults = CvmResults.substring(11, CvmResults.length() - 1);
+            terminalInfo.ApplicationInterchangeProfile = ApplicationInterchangeProfile.substring(9, ApplicationInterchangeProfile.length() - 1);
+            terminalInfo.TerminalVerificationResult = TerminalVerificationResult.substring(9, TerminalVerificationResult.length() - 1);
+            terminalInfo.TransactionDate = TransactionDate.substring(9, TransactionDate.length() - 1);
+            terminalInfo.CryptogramInformationData = "80";
+            terminalInfo.Cryptogram = Cryptogram.substring(11, Cryptogram.length() - 1);
+            terminalInfo.TerminalCapabilities = TerminalCapabilities.substring(11, TerminalCapabilities.length() - 1);
+            terminalInfo.cardSequenceNumber = cardSequenceNumber.substring(11, cardSequenceNumber.length() - 1);
+            terminalInfo.atc = atc.substring(11, atc.length() - 1);
+            terminalInfo.iad = iad.substring(11, iad.length() - 1);
+            terminalInfo.track2 = track2.substring(9, track2.length() - 1);
+            String strTrack2 = terminalInfo.track2.split("F")[0];
+            String pan = strTrack2.split("D")[0];
+            String expiry = strTrack2.split("D")[1].substring(0, 4);
+            Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
+            Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
+            Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
+
+            terminalInfo.pan = pan;
+            terminalInfo.expiryYear = expiry.substring(0, 2);
+            terminalInfo.expiryMonth = expiry.substring(2);
+            terminalInfo.AmountAuthorized = AmountAuthorized.substring(11, AmountAuthorized.length() - 1);
+            terminalInfo.UnpredictableNumber = UnpredictableNumber.substring(11, UnpredictableNumber.length() - 1);
+//            if(tlvDataList.getTLV(EmvTags.EMV_TAG_IC_APNAME) != null){
+//                //terminalInfo.CardType = tlvDataList.getTLV(EmvTags.EMV_TAG_IC_APNAME).getGBKValue();
+//            }
+            String reult = new Gson().toJson(terminalInfo);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return terminalInfo;
+    }
+
+
+    private void incompleteParameters() {
+        Intent intent = new Intent();
+        TerminalResponse response = new TerminalResponse();
+        response.responseCode = incompleteParameters;
+        response.responseDescription = "Incomplete Parameter";
+        String fullPay = new Gson().toJson(response);
+        intent.putExtra(getString(R.string.data), fullPay);
+        finishTransaction(intent);
+    }
+
+    private void initializationError() {
+        Intent intent = new Intent();
+        TerminalInfo response = new TerminalInfo();
+        response.responseCode = initializationError;
+        response.responseDescription = ERROR;
+        String fullPay = new Gson().toJson(response);
+        intent.putExtra(getString(R.string.data), fullPay);
+        finishTransaction(intent);
+    }
+
+    private void finishTransaction(Intent intent) {
+        setResult(Activity.RESULT_OK, intent);
+        finish();
+    }
+
     private void sendMsgDelay(int what) {
         Message msg = new Message();
         msg.what = what;
@@ -2385,25 +2949,50 @@ public class OtherActivity extends BaseActivity {
                 statusEditText.setText(R.string.wait);
                 return;
             } else if (v == doTradeButton) {//do trade button
-                mhipStatus.setTextColor(getResources().getColor(R.color.eb_col_34));
-                mhipStatus.setText("");
-                if (pos == null) {
-                    statusEditText.setText(R.string.scan_bt_pos_error);
+
+                USBClass usb = new USBClass();
+                ArrayList<String> deviceList = usb.GetUSBDevices(getBaseContext());
+                if (deviceList == null) {
+                    Toast.makeText(mContext, "No Permission", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                isPinCanceled = false;
+                final CharSequence[] items = deviceList.toArray(new CharSequence[deviceList.size()]);
+                AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+                builder.setTitle("Select a Reader");
+                builder.setSingleChoiceItems(items, -1, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int item) {
+                        String selectedDevice = (String) items[item];
+                        dialog.dismiss();
+                        usbDevice = USBClass.getMdevices().get(selectedDevice);
+                        open(QPOSService.CommunicationMode.USB_OTG_CDC_ACM);
+                        posType = POS_TYPE.OTG;
+                        pos.openUsb(usbDevice);
+                    }
+                });
+                AlertDialog alert = builder.create();
+                alert.show();
 
-                statusEditText.setText(R.string.starting);
-//                terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
-                if (posType == POS_TYPE.UART) {//postype is UART
-                    pos.setCardTradeMode(QPOSService.CardTradeMode.SWIPE_TAP_INSERT_CARD_NOTUP);
-//                    pos.doTrade(terminalTime, 0, 30);
-                    pos.doTrade(20);
-                } else {
-                    int keyIdex = getKeyIndex();
+//                mhipStatus.setTextColor(getResources().getColor(R.color.eb_col_34));
+//                mhipStatus.setText("");
+//                if (pos == null) {
+//                    Log.e("TAG", "Pos is null");
+//                    statusEditText.setText(R.string.scan_bt_pos_error);
+//                    return;
+//                }
+//
+//                Log.e("TAG", "Starting");
+//                isPinCanceled = false;
+//                statusEditText.setText(R.string.starting);
+////                terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
+//                if (posType == POS_TYPE.UART) {//postype is UART
 //                    pos.setCardTradeMode(QPOSService.CardTradeMode.SWIPE_TAP_INSERT_CARD_NOTUP);
-                    pos.doTrade(keyIdex, 30);//start do trade
-                }
+////                    pos.doTrade(terminalTime, 0, 30);
+//                    pos.doTrade(20);
+//                } else {
+//                    int keyIdex = getKeyIndex();
+////                    pos.setCardTradeMode(QPOSService.CardTradeMode.SWIPE_TAP_INSERT_CARD_NOTUP);
+//                    pos.doTrade(keyIdex, 30);//start do trade
+//                }
             } else if (v == btnUSB) {
                 USBClass usb = new USBClass();
                 ArrayList<String> deviceList = usb.GetUSBDevices(getBaseContext());

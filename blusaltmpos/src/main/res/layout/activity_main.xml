@@ -21,11 +21,13 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:hint="Enter Bluetooth Mac - 98:27:82:4C:6D:42"
-        android:text="98:27:82:4C:6D:42"
+        android:text="30:3D:51:43:75:20"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/textview_first" />
 
+<!--    30:3D:51:43:75:20 suru-->
+<!--    MPOS2308140161-->
 
 <!--    04:D1:6E:54:1F:55-->
 <!--    MPOS9112000755 -->
@@ -34,7 +36,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:hint="Enter Bluetooth Tittle - MPOS2111050246"
-        android:text="MPOS2111050246"
+        android:text="MPOS2308140161"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/editview_mac" />
