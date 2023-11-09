@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun startAccountSelectionActivity(amount: Double) {
-        val intent = Intent(this, OtherActivity::class.java)
+        val intent = Intent(this, PosActivity::class.java)
         intent.putExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE, "10")
         intent.putExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, amount)
         intent.putExtra(Constants.TERMINAL_ID, "2076NA61")
@@ -81,8 +81,8 @@ class MainActivity : AppCompatActivity() {
 //        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140151")
 //        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:17") //seyi 152
 //        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140152")
-//        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "98:27:82:4C:6D:42") //seyi
-//        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2111050246")
+        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "98:27:82:4C:6D:42") //seyi
+        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2111050246")
         startActivityForResult(intent, 100)
     }
 

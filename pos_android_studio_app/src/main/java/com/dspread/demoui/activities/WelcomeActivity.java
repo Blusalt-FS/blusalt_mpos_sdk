@@ -29,7 +29,7 @@ import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.FileCallback;
 import com.lzy.okgo.model.Progress;
 import com.lzy.okgo.request.base.Request;
-import com.xuexiang.xutil.app.PathUtils;
+//import com.xuexiang.xutil.app.PathUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -78,27 +78,27 @@ public class WelcomeActivity extends BaseActivity implements OnClickListener {
         print.setOnClickListener(this);
         mp600Print.setOnClickListener(this);
         bluetoothRelaPer();
-        try {
-            boolean b = NetCheckHelper.checkNetworkAvailable(WelcomeActivity.this);
-            if (b) {
-                checkNewVersion();
-                TRACE.d("network connection");
-            } else {
-                Toast.makeText(this, "No network connection", Toast.LENGTH_SHORT).show();
-                TRACE.d("no network connection");
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            boolean b = NetCheckHelper.checkNetworkAvailable(WelcomeActivity.this);
+//            if (b) {
+//                checkNewVersion();
+//                TRACE.d("network connection");
+//            } else {
+//                Toast.makeText(this, "No network connection", Toast.LENGTH_SHORT).show();
+//                TRACE.d("no network connection");
+//            }
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
 
     }
 
-    private void checkNewVersion() throws IOException {
-        String commitUrl = "https://gitlab.com/api/v4/projects/4128550/jobs/artifacts/master/raw/pos_android_studio_demo/pos_android_studio_app/build/outputs/apk/release/commit.json?job=assembleRelease";
-        downloadFileCourse(WelcomeActivity.this, commitUrl, PathUtils.getAppExtCachePath(), "commit.json");
-    }
+//    private void checkNewVersion() throws IOException {
+//        String commitUrl = "https://gitlab.com/api/v4/projects/4128550/jobs/artifacts/master/raw/pos_android_studio_demo/pos_android_studio_app/build/outputs/apk/release/commit.json?job=assembleRelease";
+//        downloadFileCourse(WelcomeActivity.this, commitUrl, PathUtils.getAppExtCachePath(), "commit.json");
+//    }
 
     @Override
     public void onToolbarLinstener() {
@@ -228,7 +228,7 @@ public class WelcomeActivity extends BaseActivity implements OnClickListener {
                     public void onClick(DialogInterface dialog, int which) {
                         dialog.dismiss();
                         // String downloadUrl = "https://gitlab.com/api/v4/projects/4128550/jobs/artifacts/develop_new_demo/raw/pos_android_studio_demo/pos_android_studio_app/build/outputs/apk/release/pos_android_studio_app-release.apk?job=assembleRelease";
-                        UpdateAppHelper.useApkDownLoadFunction(WelcomeActivity.this, downUrl);
+//                        UpdateAppHelper.useApkDownLoadFunction(WelcomeActivity.this, downUrl);
                     }
                 });
         builder.setCloseButton(new CustomDialog.OnCloseClickListener() {

@@ -194,7 +194,7 @@ public class OtherActivity extends BaseActivity {
         initView();
         initIntent();
         initListener();
-        proceedToPayment();
+//        proceedToPayment();
     }
 
     private void proceedToPayment() {
@@ -408,7 +408,7 @@ public class OtherActivity extends BaseActivity {
         Handler handler = new Handler(Looper.myLooper());
         pos.initListener(handler, listener);
         String sdkVersion = pos.getSdkVersion();
-        Toast.makeText(this, "sdkVersion--" + sdkVersion, Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "sdkVersion--" + sdkVersion, Toast.LENGTH_SHORT).show();
     }
 
     /**

@@ -4,53 +4,53 @@ import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 
-import com.xuexiang.xaop.annotation.Permission;
-import com.xuexiang.xaop.consts.PermissionConsts;
-import com.xuexiang.xupdate.XUpdate;
-import com.xuexiang.xupdate._XUpdate;
-import com.xuexiang.xupdate.listener.OnUpdateFailureListener;
-import com.xuexiang.xupdate.service.OnFileDownloadListener;
-import com.xuexiang.xutil.app.PathUtils;
-import com.xuexiang.xutil.display.HProgressDialogUtils;
-import com.xuexiang.xutil.file.FileUtils;
+//import com.xuexiang.xaop.annotation.Permission;
+//import com.xuexiang.xaop.consts.PermissionConsts;
+//import com.xuexiang.xupdate.XUpdate;
+//import com.xuexiang.xupdate._XUpdate;
+//import com.xuexiang.xupdate.listener.OnUpdateFailureListener;
+//import com.xuexiang.xupdate.service.OnFileDownloadListener;
+//import com.xuexiang.xutil.app.PathUtils;
+//import com.xuexiang.xutil.display.HProgressDialogUtils;
+//import com.xuexiang.xutil.file.FileUtils;
 
 import java.io.File;
 
 public class UpdateAppHelper {
 
 
-    @Permission(PermissionConsts.STORAGE)
-    public static void useApkDownLoadFunction(Context mContext, String downloadUrl) {
-        XUpdate.newBuild(mContext)
-                // 注意在Android10及以上存在存储权限问题，不建议设置在外部存储下载目录
-                .apkCacheDir(PathUtils.getAppExtCachePath())
-                .build()
-                .download(downloadUrl, new OnFileDownloadListener() {
-                    @Override
-                    public void onStart() {
-                        deleteFile(new File(PathUtils.getAppExtCachePath()));
-                        HProgressDialogUtils.showHorizontalProgressDialog(mContext, "Download Progress", false);
-                    }
-
-                    @Override
-                    public void onProgress(float progress, long total) {
-                        HProgressDialogUtils.setProgress(Math.round(progress * 100));
-                    }
-
-                    @Override
-                    public boolean onCompleted(File file) {
-                        TRACE.d("下载路径：" + FileUtils.getFileByPath(file.getPath()));
-                        HProgressDialogUtils.cancel();
-                        _XUpdate.startInstallApk(mContext, FileUtils.getFileByPath(file.getPath()));
-                        return false;
-                    }
-
-                    @Override
-                    public void onError(Throwable throwable) {
-                        HProgressDialogUtils.cancel();
-                    }
-                });
-    }
+//    @Permission(PermissionConsts.STORAGE)
+//    public static void useApkDownLoadFunction(Context mContext, String downloadUrl) {
+//        XUpdate.newBuild(mContext)
+//                // 注意在Android10及以上存在存储权限问题，不建议设置在外部存储下载目录
+//                .apkCacheDir(PathUtils.getAppExtCachePath())
+//                .build()
+//                .download(downloadUrl, new OnFileDownloadListener() {
+//                    @Override
+//                    public void onStart() {
+//                        deleteFile(new File(PathUtils.getAppExtCachePath()));
+//                        HProgressDialogUtils.showHorizontalProgressDialog(mContext, "Download Progress", false);
+//                    }
+//
+//                    @Override
+//                    public void onProgress(float progress, long total) {
+//                        HProgressDialogUtils.setProgress(Math.round(progress * 100));
+//                    }
+//
+//                    @Override
+//                    public boolean onCompleted(File file) {
+//                        TRACE.d("下载路径：" + FileUtils.getFileByPath(file.getPath()));
+//                        HProgressDialogUtils.cancel();
+//                        _XUpdate.startInstallApk(mContext, FileUtils.getFileByPath(file.getPath()));
+//                        return false;
+//                    }
+//
+//                    @Override
+//                    public void onError(Throwable throwable) {
+//                        HProgressDialogUtils.cancel();
+//                    }
+//                });
+//    }
 
 
 
