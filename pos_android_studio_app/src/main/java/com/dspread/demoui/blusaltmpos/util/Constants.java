@@ -11,7 +11,12 @@ public class Constants {
     public static final String INTENT_BUSINESS_NAME_KEY = "raven_business_name";
 
     public static final String INTENT_CLEAR_MASTER_KEY = "clearMaster";
+
+    public static final String INTENT_MASTER_KEY = "master_key";
     public static final String INTENT_CLEAR_PIN_KEY = "pinMaster";
+
+    public static final String INTENT_TERMINAL_CONFIG = "terminal_config";
+    public static final String INTENT_KEY_CONFIG = "key_config";
 
     public static final String INTENT_CLEAR_SESSION_KEY = "session_key";
     public static final String INTENT_IP = "IP_In";
@@ -19,6 +24,9 @@ public class Constants {
 
 
     public static final String IS_KEY_INJECTED = "key_injection";
+
+    public static final String IS_KEY_MASTER_INJECTED = "key_master_injection";
+    public static final String IS_KEY_WORK_INJECTED = "key_work_injection";
     public static final String KEY_INJECTED_BLUETOOTH = "key_injected_bluetooth";
 
     public static final String INTENT_MID = "mid_key";

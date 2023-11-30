@@ -77,7 +77,7 @@ public class PosBluetoothActivity extends AppCompatActivity {
 
         implementListeners();
 
-        PosActivity.init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
+//        PosActivity.init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
 //        MemoryManager.getInstance().putUserSecretKey("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk");
 //        startAccountSelectionActivity(6.00);
     }
@@ -130,7 +130,7 @@ public class PosBluetoothActivity extends AppCompatActivity {
         send.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                PosActivity.init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
+//                PosActivity.init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
 
                 String string= String.valueOf(writeMsg.getText());
                 sendReceive.write(string.getBytes());
@@ -315,7 +315,7 @@ public class PosBluetoothActivity extends AppCompatActivity {
         Intent intent = new Intent(this, PosActivity.class);
         intent.putExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE, "10");
         intent.putExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, amount);
-        intent.putExtra(Constants.TERMINAL_ID, "2076NA61");
+//        intent.putExtra(Constants.TERMINAL_ID, "2076NA61");
         startActivityForResult(intent, 100);
     }
 

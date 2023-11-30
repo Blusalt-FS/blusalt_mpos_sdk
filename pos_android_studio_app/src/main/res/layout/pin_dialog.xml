@@ -37,6 +37,21 @@
     </com.google.android.material.appbar.AppBarLayout>
 
     <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/amount_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="32dp"
+        android:text="N40,000.00"
+        android:textColor="@color/black"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/appbar" />
+
+
+    <com.google.android.material.textview.MaterialTextView
         android:id="@+id/payType"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -48,7 +63,7 @@
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/appbar" />
+        app:layout_constraintTop_toBottomOf="@+id/amount_text" />
 
     <!--        <com.riandivayana.pinviewkeyboard.PinViewKeyboard-->
     <!--            android:id="@+id/pinEditText"-->
@@ -94,7 +109,7 @@
         android:id="@+id/pinEditText"
         android:layout_width="270dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="8dp"
         android:inputType="numberPassword"
         android:textSize="26sp"
         app:circleRadius="15dp"

@@ -1,12 +1,14 @@
 package com.dspread.demoui.blusaltmpos.util;
 
 import androidx.annotation.Keep
+import com.dspread.demoui.processor.util.TripleDES
 import java.io.ByteArrayOutputStream
 import java.security.spec.KeySpec
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.DESKeySpec
+import javax.crypto.spec.SecretKeySpec
 
 @Keep
 class KSNUtilities {
@@ -175,6 +177,25 @@ class KSNUtilities {
                 0,
                 16
             ), "^")
+    }
+
+    val key: String? = null
+    var pinLength = 0
+    @Throws(java.lang.Exception::class)
+    fun encrypt(pan: String?, pinClear: String): String? {
+//        if (pinClear.length != pinLength) {
+//            println("Incorrect PIN length given. Please fix! pinClear.size() " + "!= " + " pinLength : " + pinClear.length + " !=" + pinLength)
+//        }
+        val pinEncoded = TripleDES.encodePinBlockAsHex(pan, pinClear)
+        val tmp = TripleDES.h2b(this.key)
+        val key = ByteArray(24)
+        System.arraycopy(tmp, 0, key, 0, 16)
+        System.arraycopy(tmp, 0, key, 16, 8)
+        //        Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+        val cipher = Cipher.getInstance("TripleDES/ECB/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, TripleDES.ALGORITHM))
+        val plaintext = cipher.doFinal(TripleDES.h2b(pinEncoded))
+        return TripleDES.b2h(plaintext)
     }
 
 

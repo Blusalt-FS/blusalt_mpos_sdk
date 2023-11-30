@@ -3,6 +3,7 @@ package com.blusalt.blusaltmposapp
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.Toast
@@ -12,10 +13,12 @@ import com.dspread.demoui.activities.OtherActivity
 import com.dspread.demoui.activities.PosActivity
 import com.dspread.demoui.blusaltmpos.pay.TerminalResponse
 import com.dspread.demoui.blusaltmpos.util.Constants
+import com.dspread.demoui.processor.util.TerminalKeyParamDownloadListener
 import com.google.gson.Gson
 import java.lang.String
 import kotlin.Double
 import kotlin.Int
+import kotlin.toString
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,9 +29,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        PosActivity.clearData(applicationContext);
         PosActivity.init(
-            "test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk",
-            applicationContext
+            "live_8ec3f5be5a2c2fd38a0777878af87a620f1c1985ac6a9d23a93b854a9ed147115c947588f126e8214a492e63de35e0751690553197588",
+            applicationContext,
+            listener
         )
 
         mac = findViewById<View>(R.id.editview_mac) as EditText
@@ -42,7 +47,7 @@ class MainActivity : AppCompatActivity() {
             } else if (tittle?.getText().toString().isEmpty()) {
                 Toast.makeText(applicationContext, "Input TITTLE", Toast.LENGTH_SHORT).show()
             } else {
-                startAccountSelectionActivity(38.0);
+                startAccountSelectionActivity(36.0);
             }
 //            val bluSaltPrinter = BluSaltPrinter()
 //            bluSaltPrinter.printerType = PrinterType.PosTransaction
@@ -69,20 +74,35 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    var listener: TerminalKeyParamDownloadListener = object : TerminalKeyParamDownloadListener {
+        override fun onSuccess(message: kotlin.String) {
+            Log.e("TAG: ", "Result: $message")
+            Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
+        }
+
+        override fun onFailed(error: kotlin.String) {
+            Log.e("TAG: ", "Result: $error")
+            Toast.makeText(applicationContext, error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
     private fun startAccountSelectionActivity(amount: Double) {
         val intent = Intent(this, PosActivity::class.java)
         intent.putExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE, "10")
         intent.putExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, amount)
-        intent.putExtra(Constants.TERMINAL_ID, "2076NA61")
-        intent.putExtra(Constants.BLUETOOTH_ADDRESS, mac?.getText().toString())
-        intent.putExtra(Constants.BLUETOOTH_TITTLE, tittle?.getText().toString())
+//        intent.putExtra(Constants.TERMINAL_ID, "2076NA61") //fizido
+//        intent.putExtra(Constants.TERMINAL_ID, "2BLU0066")
+//        intent.putExtra(Constants.BLUETOOTH_ADDRESS, mac?.getText().toString())
+//        intent.putExtra(Constants.BLUETOOTH_TITTLE, tittle?.getText().toString())
+         intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:20") //not seyi 161
+        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140161")
 //        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:16") //seyi 151
 //        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140151")
 //        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "30:3D:51:43:75:17") //seyi 152
 //        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2308140152")
-        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "98:27:82:4C:6D:42") //seyi
-        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2111050246")
+//        intent.putExtra(Constants.BLUETOOTH_ADDRESS, "98:27:82:4C:6D:42") //seyi
+//        intent.putExtra(Constants.BLUETOOTH_TITTLE, "MPOS2111050246")
         startActivityForResult(intent, 100)
     }
 
@@ -91,6 +111,9 @@ class MainActivity : AppCompatActivity() {
         if (data != null && data.hasExtra("data")) {
             val result = data.getStringExtra("data")
             val response: TerminalResponse = Gson().fromJson(result, TerminalResponse::class.java)
+//            val response: TerminalInfoProcessor = Gson().fromJson(result, TerminalInfoProcessor::class.java)
+            Log.e("E reach", "E reach " + Gson().toJson(response))
+
             AlertDialog.Builder(this)
                 .setTitle(String.valueOf(response.responseCode))
                 .setMessage(response.responseDescription)

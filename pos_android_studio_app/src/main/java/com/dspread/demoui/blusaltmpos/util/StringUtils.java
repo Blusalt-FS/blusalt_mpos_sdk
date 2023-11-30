@@ -4,6 +4,8 @@ import androidx.annotation.Keep;
 
 
 import com.dspread.demoui.blusaltmpos.pay.TerminalInfo;
+import com.dspread.demoui.blusaltmpos.pay.TerminalResponse;
+import com.dspread.demoui.processor.processor_blusalt.TerminalInfoProcessor;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -23,8 +25,8 @@ public class StringUtils {
         }
     }
 
-    public static TerminalInfo getTransactionTesponse(String message, int code) {
-        TerminalInfo response = new TerminalInfo();
+    public static TerminalInfoProcessor getTransactionTesponse(String message, int code) {
+        TerminalInfoProcessor response = new TerminalInfoProcessor();
         response.responseCode = String.valueOf(code);
         response.responseDescription = message;
         return  response;

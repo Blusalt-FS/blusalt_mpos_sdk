@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Application;
 import android.app.Dialog;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothDevice;
@@ -46,6 +47,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.dspread.demoui.Pos;
 import com.dspread.demoui.blusaltmpos.pay.BlusaltTerminalInfo;
 import com.dspread.demoui.blusaltmpos.pay.CreditCard;
 import com.dspread.demoui.blusaltmpos.pay.TerminalInfo;
@@ -55,6 +57,7 @@ import com.dspread.demoui.blusaltmpos.pos.TlvDataList;
 import com.dspread.demoui.blusaltmpos.util.AppPreferenceHelper;
 import com.dspread.demoui.blusaltmpos.util.Constants;
 import com.dspread.demoui.blusaltmpos.util.KSNUtilities;
+import com.dspread.demoui.blusaltmpos.util.SharedPreferencesUtils;
 import com.dspread.demoui.blusaltmpos.util.StringUtils;
 import com.dspread.demoui.blusaltmpos.util.TransactionListener;
 import com.dspread.demoui.network.BaseData;
@@ -63,6 +66,24 @@ import com.dspread.demoui.network.RetrofitClientInstance;
 import com.dspread.demoui.BaseApplication;
 import com.dspread.demoui.R;
 import com.dspread.demoui.USBClass;
+import com.dspread.demoui.network.RetrofitClientInstanceParam;
+import com.dspread.demoui.network.RetrofitClientInstanceProcessor;
+import com.dspread.demoui.processor.LocalData;
+import com.dspread.demoui.processor.processor_blusalt.BlusaltTerminalInfoProcessor;
+import com.dspread.demoui.processor.processor_blusalt.CardData;
+import com.dspread.demoui.processor.processor_blusalt.EmvData;
+import com.dspread.demoui.processor.processor_blusalt.KeyDownloadRequest;
+import com.dspread.demoui.processor.processor_blusalt.KeyDownloadResponse;
+import com.dspread.demoui.processor.processor_blusalt.TerminalInfoProcessor;
+import com.dspread.demoui.processor.processor_blusalt.TerminalInformation;
+import com.dspread.demoui.processor.processor_blusalt.param.ModelError;
+import com.dspread.demoui.processor.processor_blusalt.param.ParamDownloadResponse;
+import com.dspread.demoui.processor.util.AppExecutors;
+import com.dspread.demoui.processor.util.StringUtil;
+import com.dspread.demoui.processor.util.TerminalKeyParamDownloadListener;
+import com.dspread.demoui.processor.util.TimeUtil;
+import com.dspread.demoui.processor.util.TripleDES;
+import com.dspread.demoui.processor.util.ValueGenerator;
 import com.dspread.demoui.utils.DUKPK2009_CBC;
 import com.dspread.demoui.utils.FileUtils;
 import com.dspread.demoui.utils.ParseASN1Util;
@@ -83,9 +104,16 @@ import com.dspread.xpos.QPOSService.LcdModeAlign;
 import com.dspread.xpos.QPOSService.TransactionResult;
 import com.dspread.xpos.QPOSService.TransactionType;
 import com.dspread.xpos.QPOSService.UpdateInformationResult;
+import com.dspread.xpos.Util;
+import com.dspread.xpos.utils.AESUtil;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -117,6 +145,11 @@ import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static com.dspread.demoui.network.APIConstant.ERROR;
 import static com.dspread.demoui.network.APIConstant.incompleteParameters;
 import static com.dspread.demoui.network.APIConstant.initializationError;
+import static com.dspread.print.Utils.HexStringToByteArray;
+import static com.dspread.print.Utils.get;
+import static com.dspread.xpos.QPOSService.FORMATID.MKSK;
+
+import org.bouncycastle.crypto.CryptoException;
 
 @Keep
 public class PosActivity extends BaseActivity implements TransactionListener {
@@ -140,6 +173,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     private Button btn_exchange_cert, btn_verify_keys, btn_remote_key_loading;
     private String verifySignatureCommand, pedvVerifySignatureCommand;
     private String KB;
+
+    static String mClearTPK;
     private boolean isInitKey;
     private boolean isUpdateFw = false;
 
@@ -169,11 +204,15 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
     private String serialNo;
     private String cPin = "";
+
+    private String iccDATA = "";
     private CreditCard creditCard;
 
     private POS_TYPE posType = POS_TYPE.BLUETOOTH;
     private boolean isVisiblePosID;
 
+    private boolean isUpdateWorkKeyResult;
+    private boolean isSetMasterKeyResult;
     private static final int BLUETOOTH_CODE = 100;
     private static final int LOCATION_CODE = 101;
     private LocationManager lm;//【Location management】
@@ -184,6 +223,17 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     private GifImageView spinKit;
 
     private AppPreferenceHelper appPreferenceHelper;
+
+    private static TerminalKeyParamDownloadListener mlistener;
+    public static LocalData localData;
+
+    static String merchantId;
+
+    static String terminalId;
+    static String tsk;
+    static String merchantLoc;
+    static String merchantCategoryCode;
+    static KeyDownloadResponse mKeyDownloadResponse;
 
 //    @Override
 //    public void onGuideListener(Button button) {
@@ -231,10 +281,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.pos_loader_view);
+        new Pos().init(getApplicationContext());
 
         bluetoothRelaPer();
         appPreferenceHelper = new AppPreferenceHelper(this);
-
+        localData = new LocalData(getApplicationContext());
 //        totalAmount = 5.00;
 //        blueTootchAddress = "98:27:82:4C:6D:42";
 //        blueTitle = "MPOS2111050246";
@@ -244,7 +295,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             if (intent != null) {
                 totalAmount = intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0);
                 accountType = intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE);
-                terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
+//                terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
                 blueTootchAddress = intent.getStringExtra(Constants.BLUETOOTH_ADDRESS);
                 blueTitle = intent.getStringExtra(Constants.BLUETOOTH_TITTLE);
 
@@ -254,13 +305,12 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 Log.e("TAG Amount", String.valueOf(totalAmount));
                 Log.e("TAG Amount", Long.toString(totalAmount.longValue()));
                 totalAmountPrint = totalAmount;
-                if (!TextUtils.isEmpty(intent.getStringExtra(Constants.TERMINAL_ID))
-                        && !TextUtils.isEmpty(String.valueOf(intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0)))
+                if (!TextUtils.isEmpty(String.valueOf(intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0)))
                         && !TextUtils.isEmpty(intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE))
                 ) {
                     totalAmount = intent.getDoubleExtra(Constants.INTENT_EXTRA_AMOUNT_KEY, 0.0);
                     accountType = intent.getStringExtra(Constants.INTENT_EXTRA_ACCOUNT_TYPE);
-                    terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
+//                    terminalId = intent.getStringExtra(Constants.TERMINAL_ID);
                     totalAmountPrint = totalAmount;
                 } else {
                     incompleteParameters();
@@ -283,7 +333,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     }
 
     private Boolean isSecretKeyAdded() {
-        return MemoryManager.getInstance(getApplicationContext()).isSecretActivated();
+        return MemoryManager.getInstance().isSecretActivated();
     }
 
     public void bluetoothRelaPer() {
@@ -931,12 +981,12 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             } else if (result == QPOSService.DoTradeResult.TRY_ANOTHER_INTERFACE) {
                 Log.e("Log TAG", getString(R.string.try_another_interface));
             } else if (result == DoTradeResult.ICC) {
-//                Log.e("Log TAG", getString(R.string.icc_card_inserted));
+                Log.e("Log TAG", getString(R.string.icc_card_inserted));
                 TRACE.d("EMV ICC Start, icc_card_inserted");
 //                String maskedPAN = decodeData.get("maskedPAN");
 //                String expiryDate = decodeData.get("expiryDate");
 //                String cardHolderName = decodeData.get("cardholderName");
-//                Log.e("Check", maskedPAN +" "+ expiryDate +" "+ cardHolderName);
+//                Log.e("Check ICC", maskedPAN +" "+ expiryDate +" "+ cardHolderName);
                 pos.doEmvApp(EmvOption.START);
             } else if (result == DoTradeResult.NOT_ICC) {
                 Log.e("Log TAG", getString(R.string.card_inserted));
@@ -1294,9 +1344,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         @Override
         public void onQposIdResult(Hashtable<String, String> posIdTable) {
             TRACE.w("onQposIdResult():" + posIdTable.toString());
+//            pos.getKeyCheckValue(0, QPOSService.CHECKVALUE_KEYTYPE.DUKPT_MKSK_ALLTYPE);
 
             String posId = posIdTable.get("posId") == null ? "" : posIdTable.get("posId");
             serialNo = posId;
+
             String csn = posIdTable.get("csn") == null ? "" : posIdTable.get("csn");
             String psamId = posIdTable.get("psamId") == null ? "" : posIdTable
                     .get("psamId");
@@ -1317,29 +1369,25 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                BaseApplication.setmPosID(posId);
                 TRACE.w("onQposIdResult() posId :" + posId);
             }
+
             isPinCanceled = false;
             terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
 
-            if (appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_INJECTED)
-                    && appPreferenceHelper.getSharedPreferenceString(Constants.KEY_INJECTED_BLUETOOTH).equals(blueTootchAddress)) {
-                pos_view_update.setText("Insert Card into mPOS");
-                if (posType == POS_TYPE.UART) {
-                    Log.e("TAG", "dotrade");
-                    pos.doTrade(terminalTime, 0, 60);
-                } else {
-                    Log.e("TAG", "start do trade");
-//                int keyIdex = getKeyIndex();
-                    pos.doTrade(0, 30);//start do trade
-                }
-            }else {
-                if (pos == null) {
-                    pos = QPOSService.getInstance(CommunicationMode.BLUETOOTH);
-                    pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
-                    Log.e("TAG open", "updating...");
-                } else {
-                    pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
-                    Log.e("TAG open", "updating...");
-                }
+            Log.e("Check Param Download", String.valueOf(SharedPreferencesUtils.getInstance().getBooleanValue(Constants.INTENT_TERMINAL_CONFIG, false)));
+            Log.e("Check Key Download", String.valueOf(SharedPreferencesUtils.getInstance().getBooleanValue(Constants.INTENT_KEY_CONFIG, false)));
+
+//            serialNo = "98211206904599";
+            if (!SharedPreferencesUtils.getInstance().getBooleanValue(Constants.INTENT_TERMINAL_CONFIG, false)){
+                Log.e("Check Config Download", "Download now");
+                pos_view_update.setText("Configuring Mpos Device");
+                downloadConfigurations(serialNo, Pos.mContext, mlistener);
+            }else if(!SharedPreferencesUtils.getInstance().getBooleanValue(Constants.INTENT_KEY_CONFIG, false)){
+                pos_view_update.setText("Configuring Mpos Device");
+                Log.e("Check Key Download", "Download now");
+                downloadConfigurations(serialNo, Pos.mContext, mlistener);
+            }else{
+                sendMsg(1202);
+                Log.e("Check Config Download", "Do nothing");
             }
 
         }
@@ -1488,6 +1536,14 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dialog.setTitle(R.string.request_data_to_server);
             Hashtable<String, String> decodeData = pos.anlysEmvIccData(tlv);
             TRACE.d("anlysEmvIccData(tlv):" + decodeData.toString());
+            TRACE.d("anlysEmvIccData(tlv):" + decodeData.get("pinBlock"));
+            TRACE.d("iccData(tlv):" + decodeData.get("iccdata"));
+
+            if (!decodeData.get("pinBlock").isEmpty()) {
+                creditCard.setPINBLOCK(decodeData.get("iccdata"));
+            } else {
+                creditCard.setPINBLOCK("");
+            }
 
             String track2 = String.valueOf(pos.getICCTag(QPOSService.EncryptType.PLAINTEXT, 0, 1, "57"));
             Log.e("Tag track2", track2.substring(5, track2.length() - 1));
@@ -1509,6 +1565,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
             creditCard.setCardNumber(cardNo);
             creditCard.setExpireDate(expiryDate);
+
+            CreditCard.EmvData emvData = new CreditCard.EmvData("", track2, decodeData.get("iccdata"));
+            creditCard.setEmvData(emvData);
+
 
 //            if (isPinCanceled) {
 //                ((TextView) dialog.findViewById(R.id.messageTextView))
@@ -1654,6 +1714,10 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onRequestQposConnected() {
             TRACE.d("onRequestQposConnected()");
             Toast.makeText(PosActivity.this, "Mpos Connected", Toast.LENGTH_LONG).show();
+//            boolean a = pos.resetPosStatus();
+//            if (a) {
+//                Log.e("Log TAG", "pos reset");
+//            }
             dismissDialog();
             long use_time = new Date().getTime() - start_time;
             // Log.e("Log TAG", getString(R.string.device_plugged));
@@ -1826,23 +1890,28 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         public void onRequestUpdateWorkKeyResult(UpdateInformationResult result) {
             TRACE.d("onRequestUpdateWorkKeyResult(UpdateInformationResult result):" + result);
             if (result == UpdateInformationResult.UPDATE_SUCCESS) {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, true);
                 Log.e("Log TAG", "update work key success");
             } else if (result == UpdateInformationResult.UPDATE_FAIL) {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, false);
                 Log.e("Log TAG", "update work key fail");
             } else if (result == UpdateInformationResult.UPDATE_PACKET_VEFIRY_ERROR) {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, false);
                 Log.e("Log TAG", "update work key packet vefiry error");
             } else if (result == UpdateInformationResult.UPDATE_PACKET_LEN_ERROR) {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, false);
                 Log.e("Log TAG", "update work key packet len error");
             }
+            sendMsg(1203);
         }
 
         @Override
         public void onReturnCustomConfigResult(boolean isSuccess, String result) {
-            if (isSuccess){
+            if (isSuccess) {
                 appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_INJECTED, true);
                 appPreferenceHelper.setSharedPreferenceString(Constants.KEY_INJECTED_BLUETOOTH, blueTootchAddress);
                 Log.e("Log TAG", "Key Injected: " + isSuccess + "\nblueTootchAddress: " + blueTootchAddress);
-            }else {
+            } else {
                 appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_INJECTED, false);
             }
             sendMsg(1203);
@@ -1865,6 +1934,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dialog.setTitle(getString(R.string.enter_pin));
 
 //            pinEditText = (EditText) dialog.findViewById(R.id.pinEditText);
+            TextView amount = dialog.findViewById(R.id.amount_text);
+            amount.setText("₦ " + Long.toString(totalAmount.longValue()) + ".00");
 
             dialog.findViewById(R.id.confirmButton).setOnClickListener(new OnClickListener() {
 
@@ -1874,14 +1945,31 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                     if (pin.length() >= 4 && pin.length() <= 12) {
 //                        if (pin.equals("000000")) {
 //                            pos.sendEncryptPin("5516422217375116");
-//
 //                        } else {
 //                            pos.sendPin(pin);
 //                        }
 //                        TRACE.d("myPinblock" + " " + pin);
 
+//                        String newPin = "";
+//                        //this part is used to enctypt the plaintext pin with random seed
+//                        if (pos.getCvmKeyList() != null && !("").equals(pos.getCvmKeyList())) {
+//                            String keyList = Util.convertHexToString(pos.getCvmKeyList());
+//                            for (int i = 0; i < pin.length(); i++) {
+//                                for (int j = 0; j < keyList.length(); j++) {
+//                                    if (keyList.charAt(j) == pin.charAt(i)) {
+//                                        newPin = newPin + Integer.toHexString(j) + "";
+//                                        break;
+//                                    }
+//                                }
+//                            }
+//                        }
+//                        Log.e("TAG", "Pinblock0 Gotten" + pos.getEncryptData());
+//
+//                        String pinBlock = buildCvmPinBlock(pos.getEncryptData(), newPin);// build the ISO format4 pin block
+//                        pos.sendCvmPin(pinBlock, true);
+//
                         pos_view_update.setText("Processing Transaction");
-                        cPin = pin;
+//                        cPin = pin;
                         creditCard.setPIN(pin);
                         pos.sendPin(pin);
                     } else {
@@ -1913,10 +2001,60 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             dialog.show();
         }
 
+
+        private String buildCvmPinBlock(Hashtable<String, String> value, String pin) {
+            String randomData = value.get("RandomData") == null ? "" : value.get("RandomData");
+            String pan = value.get("PAN") == null ? "" : value.get("PAN");
+            String AESKey = value.get("AESKey") == null ? "" : value.get("AESKey");
+            String isOnline = value.get("isOnlinePin") == null ? "" : value.get("isOnlinePin");
+            String pinTryLimit = value.get("pinTryLimit") == null ? "" : value.get("pinTryLimit");
+            //iso-format4 pinblock
+            int pinLen = pin.length();
+            pin = "4" + Integer.toHexString(pinLen) + pin;
+            for (int i = 0; i < 14 - pinLen; i++) {
+                pin = pin + "A";
+            }
+            pin += randomData.substring(0, 16);
+            String panBlock = "";
+            int panLen = pan.length();
+            int m = 0;
+            if (panLen < 12) {
+                panBlock = "0";
+                for (int i = 0; i < 12 - panLen; i++) {
+                    panBlock += "0";
+                }
+                panBlock = panBlock + pan + "0000000000000000000";
+            } else {
+                m = pan.length() - 12;
+                panBlock = m + pan;
+                for (int i = 0; i < 31 - panLen; i++) {
+                    panBlock += "0";
+                }
+            }
+            String pinBlock1 = AESUtil.encrypt(AESKey, pin);
+            Log.e("TAG", "Pinblock1 Gotten" + pinBlock1);
+
+            pin = Util.xor16(HexStringToByteArray(pinBlock1), HexStringToByteArray(panBlock));
+            Log.e("TAG", "Pin Gotten" + pin);
+
+            String pinBlock2 = AESUtil.encrypt(AESKey, pin);
+            Log.e("TAG", "Pinblock1 Gotten" + pinBlock2);
+
+            return pinBlock2;
+        }
+
+
         @Override
         public void onReturnSetMasterKeyResult(boolean isSuccess) {
             TRACE.d("onReturnSetMasterKeyResult(boolean isSuccess) : " + isSuccess);
-            Log.e("Log TAG", "result: " + isSuccess);
+            Log.e("Log TAG", "onReturnSetMasterKeyResult result: " + isSuccess);
+            if (isSuccess) {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED, true);
+                sendMsg(1203);
+            } else {
+                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED, false);
+            }
+
         }
 
         @Override
@@ -2660,7 +2798,6 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     }
 
     private String ksn;
-    private String terminalId;
 
     private void proceedToExChangeData(String responseCode, CreditCard creditCard) {
 //        if (creditCard.getPIN() == null) {
@@ -2672,17 +2809,39 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         KSNUtilities ksnUtilitites = new KSNUtilities();
         //  String workingKey = ksnUtilitites.getWorkingKey("3F2216D8297BCE9C", "000002DDDDE00002");
 
-
         String workingKey = ksnUtilitites.getWorkingKey("3F2216D8297BCE9C", getInitialKSN());
         String pinBlock = ksnUtilitites.DesEncryptDukpt(workingKey, response.pan, cPin);
+
+        Log.e("TAG", "Check Gotten " + mClearTPK);
+        Log.e("TAG", "Check Gotten " + response.pan);
+        Log.e("TAG", "Check Gotten " + creditCard.getPIN());
+
+        String newPinBlock = null;
+        try {
+            newPinBlock = new TripleDES(mClearTPK, 4).encrypt(response.pan, creditCard.getPIN());
+            if (!creditCard.getPINBLOCK().isEmpty()) {
+                cPin = newPinBlock;
+                Log.e("TAG", "Pinblock Gotten" + newPinBlock);
+            } else {
+                cPin = "";
+            }
+            Log.e("TAG", "Pinblock new Gotten" + newPinBlock);
+        } catch (Exception e) {
+            e.printStackTrace();
+//            throw new RuntimeException(e);
+        }
+
 
         ksn = ksnUtilitites.getLatestKsn();
 
         response.ksn = ksn;
-        response.pinBlock = pinBlock;
-        response.terminalId = "2076NA61";
+//        response.pinData = newPinBlock;
+//        response.terminalId = "2076NA61";
+        iccDATA = creditCard.getEmvData().getIccData();
 //        response.terminalId = terminalId;
         // response.cardOwner = creditCard.getHolderName();
+        Log.e("ICC DATA ", creditCard.getEmvData().getIccData());
+
         stopEmvProcess(response);
     }
 
@@ -2699,6 +2858,9 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         return "0000000002DDDDE" + String.format("%05d", latestKSN);
     }
 
+    String time = new TimeUtil().getTimehhmmss(new Date(System.currentTimeMillis()));
+    String date = new TimeUtil().getDateMMdd(new Date(System.currentTimeMillis()));
+
     private void stopEmvProcess(TerminalInfo response) {
         AppLog.d("Processing", "Transaction" + "Please wait");
         Log.e("Processing", "Processing Transaction....");
@@ -2709,6 +2871,47 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         blusaltTerminalInfo.device = "MPOS " + getDeviceModel();
         blusaltTerminalInfo.currency = "NGN";
         blusaltTerminalInfo.currencyCode = "566";
+
+        LocalData localData = new LocalData(getApplicationContext());
+        String getTsk = localData.getTsk();
+        String getMerchantId = localData.getMerchantId();
+        String getMerchantLoc = localData.getMerchantLoc();
+        String getMerchantCategoryCode = localData.getMerchantCategoryCode();
+        String getTerminalId = localData.getTerminalId();
+
+        Log.e("Processing", "KeyDownloadResponse: " + getTsk);
+        Log.e("Processing", "KeyDownloadResponse: " + getTerminalId);
+
+        response.terminalId = getTerminalId;
+        response.sessionKey = getTsk;
+        TerminalInformation terminalInformation = new TerminalInformation();
+        terminalInformation.merchantID = getMerchantId;
+        terminalInformation.merchantNameAndLocation = getMerchantLoc;
+        terminalInformation.merchantCategoryCode = getMerchantCategoryCode;
+        terminalInformation.posConditionCode = "00";
+        terminalInformation.posEntryMode = "051";
+        terminalInformation.terminalId = response.terminalId;
+        response.terminalInformation = terminalInformation;
+
+        response.processingCode = "000000";
+        response.de62 = "MA";
+        response.de63 = "05660566";
+
+        String serviceCode = new ValueGenerator().getServiceCode(response.track2, response.pan);
+        CardData cardData = new CardData();
+        cardData.cardHolderName = response.cardOwner;
+        cardData.cardSequenceNumber = response.cardSequenceNumber;
+        cardData.expiryDate = response.expiryYear + response.expiryMonth;
+        cardData.pan = response.pan;
+        cardData.serviceCode = response.cardSequenceNumber;
+        cardData.track2Data = response.track2;
+        response.cardData = cardData;
+
+        EmvData emvData = new EmvData();
+        emvData.pinData = cPin;
+        emvData.iccData = response.iccdata;
+        response.emvData = emvData;
+
         response.currencyCode = "566";
         response.currency = "NGN";
         response.deviceOs = "Android";
@@ -2717,13 +2920,88 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         String rtt = new Gson().toJson(blusaltTerminalInfo);
 //        init("test_57566e7a223f98cf6aebfd093c8f295dd77f74a6690cd24672352c7477ebae336cf759516d2a2f500440686eb96d92121663836633811sk", getApplicationContext());
 //        ProcessTransaction(blusaltTerminalInfo);
-        onCompleteTransaction(response);
+//        onCompleteTransaction(response);
+
+        TerminalInfoProcessor terminalInfoProcessor = new TerminalInfoProcessor();
+        terminalInfoProcessor.AmountAuthorized = response.AmountAuthorized;
+        terminalInfoProcessor.cardOwner = response.cardOwner;
+        terminalInfoProcessor.cardSequenceNumber = response.cardSequenceNumber;
+        terminalInfoProcessor.expiryDate = response.expiryYear + response.expiryMonth;
+        terminalInfoProcessor.pan = response.pan;
+        terminalInfoProcessor.serviceCode = response.cardSequenceNumber;
+        terminalInfoProcessor.track2 = response.track2;
+        terminalInfoProcessor.currencyCode = response.currencyCode;
+        terminalInfoProcessor.currency = response.currency;
+        terminalInfoProcessor.de62 = response.de62;
+        terminalInfoProcessor.de63 = response.de63;
+        terminalInfoProcessor.iccData = iccDATA;
+        terminalInfoProcessor.pinData = cPin;
+        terminalInfoProcessor.AmountOther = response.AmountOther;
+        terminalInfoProcessor.processingCode = response.processingCode;
+        terminalInfoProcessor.rrn = new ValueGenerator().retrievalReferenceNumber();
+        terminalInfoProcessor.sessionKey = response.sessionKey;
+        terminalInfoProcessor.stan = new ValueGenerator().systemTraceAuditNumber();
+        terminalInfoProcessor.merchantCategoryCode = getMerchantCategoryCode;
+        terminalInfoProcessor.terminalMerchantID = getMerchantId;
+        terminalInfoProcessor.merchantNameAndLocation = getMerchantLoc;
+        terminalInfoProcessor.posConditionCode = "00";
+        terminalInfoProcessor.posEntryMode = "051";
+        terminalInfoProcessor.terminalId = response.terminalId;
+        terminalInfoProcessor.TransactionDate = date;
+        terminalInfoProcessor.transactionDateTime = date + time;
+        terminalInfoProcessor.transactionTime = time;
+        terminalInfoProcessor.responseCode = "00";
+        terminalInfoProcessor.responseDescription = "Data collected successfully";
+        Log.e("PROCESSOR DATA ", new Gson().toJson(terminalInfoProcessor));
+
+        BlusaltTerminalInfoProcessor blusaltTerminalInfoProcessor = new BlusaltTerminalInfoProcessor();
+        blusaltTerminalInfoProcessor.AmountAuthorized = response.AmountAuthorized;
+        blusaltTerminalInfoProcessor.cardOwner = response.cardOwner;
+        blusaltTerminalInfoProcessor.cardSequenceNumber = response.cardSequenceNumber;
+        blusaltTerminalInfoProcessor.expiryDate = response.expiryYear + response.expiryMonth;
+        blusaltTerminalInfoProcessor.pan = response.pan;
+        blusaltTerminalInfoProcessor.serviceCode = response.cardSequenceNumber;
+        blusaltTerminalInfoProcessor.track2 = response.track2;
+        blusaltTerminalInfoProcessor.currencyCode = response.currencyCode;
+        blusaltTerminalInfoProcessor.currency = response.currency;
+        blusaltTerminalInfoProcessor.de62 = response.de62;
+        blusaltTerminalInfoProcessor.de63 = response.de63;
+        blusaltTerminalInfoProcessor.iccData = iccDATA;
+        blusaltTerminalInfoProcessor.pinData = cPin;
+        blusaltTerminalInfoProcessor.AmountOther = response.AmountOther;
+        blusaltTerminalInfoProcessor.processingCode = response.processingCode;
+        blusaltTerminalInfoProcessor.rrn = new ValueGenerator().retrievalReferenceNumber();
+        blusaltTerminalInfoProcessor.sessionKey = response.sessionKey;
+        blusaltTerminalInfoProcessor.stan = new ValueGenerator().systemTraceAuditNumber();
+        blusaltTerminalInfoProcessor.merchantCategoryCode = getMerchantCategoryCode;
+        blusaltTerminalInfoProcessor.terminalMerchantID = getMerchantId;
+        blusaltTerminalInfoProcessor.merchantNameAndLocation = getMerchantLoc;
+        blusaltTerminalInfoProcessor.posConditionCode = "00";
+        blusaltTerminalInfoProcessor.posEntryMode = "051";
+        blusaltTerminalInfoProcessor.terminalId = response.terminalId;
+        blusaltTerminalInfoProcessor.TransactionDate = date;
+        blusaltTerminalInfoProcessor.transactionDateTime = date + time;
+        blusaltTerminalInfoProcessor.transactionTime = time;
+        Log.e("PROCESSORTransactionData", new Gson().toJson(blusaltTerminalInfoProcessor));
+
+//        ProcessProcessorTransaction(blusaltTerminalInfoProcessor);
+        onCompleteTransaction(terminalInfoProcessor);
     }
 
-    public static void init(String secretKey, Context context) {
+    public static void init(String secretKey, Context context, TerminalKeyParamDownloadListener listener) {
         if (!TextUtils.isEmpty(secretKey)) {
             try {
-                MemoryManager.getInstance(context).putUserSecretKey(secretKey);
+                new Pos().init(context.getApplicationContext());
+                mlistener = listener;
+//                AppExecutors.getInstance().diskIO().execute(() -> {
+//
+//                    KeyDownloadRequest keyDownloadRequest = new KeyDownloadRequest();
+//                    keyDownloadRequest.terminalId = terminalId;
+//                    ProcessKeyDownload(keyDownloadRequest);
+//
+//                });
+
+                MemoryManager.getInstance().putUserSecretKey(secretKey);
             } catch (Exception e) {
                 AppLog.e("prepareForPrinter", e.getMessage());
             }
@@ -2732,7 +3010,120 @@ public class PosActivity extends BaseActivity implements TransactionListener {
         }
     }
 
-    public void onCompleteTransaction(TerminalInfo response) {
+    public static void clearData(Context context){
+        new Pos().init(context.getApplicationContext());
+        SharedPreferencesUtils.getInstance().clear();
+    }
+
+    public void downloadConfigurations(String serial, Context context, TerminalKeyParamDownloadListener listener) {
+        try {
+            AppExecutors.getInstance().diskIO().execute(() -> {
+                mlistener = listener;
+                localData = new LocalData(context);
+                Log.e("Check Terminal Serial", serial);
+                downloadTerminalParam(serial);
+
+            });
+
+        } catch (Exception e) {
+            e.getMessage();
+        }
+    }
+
+    public void injectWorkKeys() {
+        TRACE.w("injectWorkKeys(): " + merchantId);
+
+        if (merchantId != null) {
+            Log.e("KeyDownlaod", merchantId);
+            Log.e("KeyDownlaod", tsk);
+            Log.e("KeyDownlaod", merchantLoc);
+            Log.e("KeyDownlaod", merchantCategoryCode);
+
+            String clearTPK = TripleDES.threeDesDecrypt(mKeyDownloadResponse.pinKey, mKeyDownloadResponse.masterKey);
+            Log.e("clearTPK", clearTPK.toString());
+
+
+//            int keyIndex = getKeyIndex();
+//            pos.updateWorkKey(
+//                    clearTPK, "0000000000000000",//PIN KEY
+//                    clearTPK, "0000000000000000",  //TRACK KEY
+//                    clearTPK, "0000000000000000", //MAC KEY
+//                    0, 5);
+
+//            String eTpk = TripleDES.encryptPinBlock("A252D573F89251BF9B235226D91C4507", "C85E3B97EF3486588AEFC87A57201501");
+//            String eTmkkcv = TripleDES.encryptPinBlock(eTpk, "00000000000000000000000000000000");
+
+            pos.updateWorkKey(
+                    "1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885",//PIN KEY
+                    "1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885",  //TRACK KEY
+                    "1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885", //MAC KEY
+                    0, 5);
+
+//            pos.updateWorkKey(
+//                    "9B3A7B883A100F739B3A7B883A100F73", "82E1360000000000",//PIN KEY
+//                    "9B3A7B883A100F739B3A7B883A100F73", "82E1360000000000",  //TRACK KEY
+//                    "9B3A7B883A100F739B3A7B883A100F73", "82E1360000000000", //MAC KEY
+//                    0, 5);
+
+//            pos.updateWorkKey(
+//                    eTpk, eTmkkcv.substring(0, 16),//PIN KEY
+//                    "1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885",  //TRACK KEY
+//                    "1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885", //MAC KEY
+//                    0, 5);
+
+        }
+
+    }
+
+    public void injectMasterKeys() throws CryptoException {
+        TRACE.w("injectMasterKeys(): " + merchantId);
+
+        if (merchantId != null) {
+//            Log.e("KeyDownlaod", merchantId);
+//            Log.e("KeyDownlaod", tsk);
+//            Log.e("KeyDownlaod", merchantLoc);
+//            Log.e("KeyDownlaod", merchantCategoryCode);
+//            Log.e("KeyDownlaod", terminalId);
+//
+//            localData.setMerchantId(merchantId);
+//            localData.setTsk(tsk);
+//            localData.setMerchantLoc(merchantLoc);
+//            localData.setMerchantCategoryCode(merchantCategoryCode);
+//            localData.setTerminalId(terminalId);
+//            String clearMasterKey = "C85E3B97EF3486588AEFC87A57201501";
+//
+//            String tmk = TripleDES.encryptPinBlock(clearMasterKey, "0123456789ABCDEFFEDCBA9876543210");
+//            Log.e("tmk", tmk.toString());
+//
+//            String tmkkcv = TripleDES.encryptPinBlock(tmk, "00000000000000000000000000000000");
+////            pos.setMasterKey(tmk, tmkkcv.substring(0, 16), 0);
+//
+//            pos.setMasterKey("1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885", 0);
+
+            String clearMasterKey = mKeyDownloadResponse.masterKey; //from our host
+            String previousClearMasterKey = "0123456789ABCDEFFEDCBA9876543210"; //get saving cleartmk from host
+//            String previousClearMasterKey = appPreferenceHelper.getSharedPreferenceString(Constants.INTENT_MASTER_KEY); //from our host after saving
+            Log.e("clearMasterKey", clearMasterKey.toString());
+            Log.e("previousClearMasterKey", previousClearMasterKey.toString());
+//            Log.e("previous clearMasterKey", appPreferenceHelper.getSharedPreferenceString(Constants.INTENT_MASTER_KEY));
+
+            String eTmk = TripleDES.encryptPinBlock(clearMasterKey, previousClearMasterKey); //tmk from host + previous TMK = encrypted tmk
+//            String eTmk = TripleDES.encryptPinBlock(clearMasterKey,   appPreferenceHelper.getSharedPreferenceString(Constants.INTENT_MASTER_KEY));
+            Log.e("eTmk", eTmk.toString());
+
+            String tmkkcv = StringUtil.encryptWithDES(clearMasterKey, "0000000000000000"); //tmk from host to get kcv
+//            pos.setMasterKey(tmk, tmkkcv.substring(0, 16), 0);
+            Log.e("tmkkcv", tmkkcv.toString());
+
+            pos.setMasterKey(eTmk, tmkkcv, 0);  //encrypted tmk + kcv
+//            pos.setMasterKey("1A4D672DCA6CB3351FD1B02B237AF9AE", "08D7B4FB629D0885", 0);
+
+            appPreferenceHelper.setSharedPreferenceString(Constants.INTENT_MASTER_KEY, clearMasterKey); // saving the previous tmk from host
+
+        }
+    }
+
+    public void onCompleteTransaction(TerminalInfoProcessor response) {
         try {
             String fullPay = new Gson().toJson(response);
             Log.e("TRANS DONE", new Gson().toJson(response));
@@ -2757,6 +3148,224 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             e.printStackTrace();
         }
     }
+
+    private void ProcessProcessorTransaction(BlusaltTerminalInfoProcessor blusaltTerminalInfoProcessor) {
+        RetrofitClientInstance.getInstance().getDataService().postTransactionToProcessor(blusaltTerminalInfoProcessor).enqueue(new Callback<TerminalResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<TerminalResponse> call, @NonNull Response<TerminalResponse> response) {
+                Log.e("ProcessTransaction", "ProcessTransaction" + response);
+                TerminalResponse terminalResponse = new TerminalResponse("card payment failed", "01", "Unable to process transaction");
+                if (response.isSuccessful()) {
+                    Log.e("ProcessTransaction", "ProcessTransaction response.body()" + response.body());
+
+                    if (response.body().message.contains("Access denied! invalid apiKey passed")) {
+                        terminalResponse.responseCode = "01";
+                        terminalResponse.responseDescription = "Access denied! invalid apiKey passed";
+
+                        Log.e("ProcessTransaction", "ProcessTransaction err" + new Gson().toJson(terminalResponse));
+                        apiResponseCall(terminalResponse);
+                    } else {
+                        terminalResponse = response.body();
+                        terminalResponse.responseCode = "00";
+                        terminalResponse.responseDescription = "card payment successful";
+
+                        Log.e("ProcessTransaction", "ProcessTransaction isSuccessful" + new Gson().toJson(terminalResponse));
+                        apiResponseCall(terminalResponse);
+                    }
+                } else {
+                    try {
+                        Gson gson = new Gson();
+                        Type type = new TypeToken<TerminalResponse>() {
+                        }.getType();
+                        terminalResponse = gson.fromJson(response.errorBody().charStream(), type);
+                        terminalResponse.responseCode = "01";
+                        terminalResponse.responseDescription = "card payment failed";
+
+                        Log.e("ProcessTransaction", "ProcessTransaction failed" + new Gson().toJson(terminalResponse));
+                        apiResponseCall(terminalResponse);
+                    } catch (Exception e) {
+                        Log.e("ProcessTransaction", "ProcessTransaction failed" + e.getMessage());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<TerminalResponse> call, @NonNull Throwable t) {
+                TerminalResponse terminalResponse = new TerminalResponse();
+                Log.e("ProcessTransaction", "ProcessTransaction onFailure" + t.getMessage());
+                terminalResponse.message = t.getMessage();
+                terminalResponse.responseCode = "02";
+                terminalResponse.responseDescription = "Unable to connect to the server";
+                apiResponseCall(terminalResponse);
+            }
+        });
+    }
+
+
+    public void downloadTerminalParam(String serialNumber) {
+        Log.e("ProcessKeyDownload", "ProcessKeyDownload");
+        RetrofitClientInstanceParam.getInstance().getDataService().downloadTerminalParam(serialNumber).enqueue(new Callback<BaseData<ParamDownloadResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<BaseData<ParamDownloadResponse>> call, @NonNull Response<BaseData<ParamDownloadResponse>> response) {
+                Log.e("ProcessKeyDownload", "response: " + response);
+                ParamDownloadResponse paramDownloadResponse = new ParamDownloadResponse();
+
+                if (response.isSuccessful()) {
+
+                    try {
+                        paramDownloadResponse = Objects.requireNonNull(response.body()).getData();
+
+                        Log.e("ProcessKeyDownload", new Gson().toJson(response.body().getData()));
+                        Log.e("ProcessKeyDownload", "isSuccessful" + response.code() + response.message());
+
+                        KeyDownloadRequest keyDownloadRequest = new KeyDownloadRequest();
+                        keyDownloadRequest.terminalId = paramDownloadResponse.terminalId.toString();
+                        ProcessKeyDownload(keyDownloadRequest);
+                        SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_TERMINAL_CONFIG, true);
+
+                        mlistener.onSuccess("Terminal Parameter Downloaded");
+//                            localData.setMerchantId(keyDownloadResponse.downloadParameter.merchantId);
+//                            localData.setTsk(keyDownloadResponse.sessionKey);
+//                            localData.setMerchantLoc(keyDownloadResponse.downloadParameter.merchantNameAndLocation);
+//                            localData.setMerchantCategoryCode(keyDownloadResponse.downloadParameter.merchantCategoryCode);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                } else {
+                    Log.e("TAG", "TerminalParameterFailed " + response.code());
+                    BufferedReader reader = null;
+                    StringBuilder sb = new StringBuilder();
+                    reader = new BufferedReader(new InputStreamReader(response.errorBody().byteStream()));
+                    String line;
+                    try {
+                        while ((line = reader.readLine()) != null) {
+                            sb.append(line);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    String finallyError = sb.toString();
+                    Log.e("TAG", "TerminalParameterFailed " + finallyError);
+
+                    ModelError modelError = new Gson().fromJson(finallyError, ModelError.class);
+                    Log.e("TAG", "TerminalParameterFailed: " + new Gson().toJson(modelError));
+                    Log.e("TAG", "TerminalParameterFailed: " + modelError.getMessage());
+
+                    SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_TERMINAL_CONFIG, false);
+
+                    mlistener.onFailed("Terminal Parameter Failed: " + modelError.getMessage());
+
+//                    try {
+//                        Gson gson = new Gson();
+//
+//                        ModelError modelError = new ModelError();
+//                        Type type = new TypeToken<ModelError>() {
+//                        }.getType();
+//
+//                        modelError = gson.fromJson(finallyError, type);
+//                        Log.e("ProcessKeyDownload", "ProcessKeyDownload failed" + modelError.getMessage());
+//
+//                    } catch (Exception e) {
+//                        Log.e("ProcessKeyDownload", "error" + e.getMessage());
+//                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<BaseData<ParamDownloadResponse>> call, @NonNull Throwable t) {
+                SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_TERMINAL_CONFIG, false);
+                mlistener.onFailed("Terminal Parameter Failed: " + t.getMessage());
+
+                KeyDownloadResponse keyDownloadResponse = new KeyDownloadResponse();
+                Log.e("ProcessKeyDownload", "onFailure" + t.getMessage());
+                Log.e("ProcessKeyDownload", "onFailure" + keyDownloadResponse);
+            }
+        });
+    }
+
+
+    public void ProcessKeyDownload(KeyDownloadRequest keyDownloadRequest) {
+        Log.e("ProcessKeyDownload", "ProcessKeyDownload");
+        RetrofitClientInstanceProcessor.getInstance().getDataService().downloadKeyExchangeFromProcessor(keyDownloadRequest).enqueue(new Callback<BaseData<KeyDownloadResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<BaseData<KeyDownloadResponse>> call, @NonNull Response<BaseData<KeyDownloadResponse>> response) {
+                Log.e("ProcessKeyDownload", "response: " + response);
+                KeyDownloadResponse keyDownloadResponse = new KeyDownloadResponse();
+
+                if (response.isSuccessful()) {
+
+                    if (response.body().getMessage().contains("Access denied! invalid apiKey passed")) {
+
+                    } else {
+
+                        try {
+
+                            keyDownloadResponse = Objects.requireNonNull(response.body()).getData();
+
+                            Log.e("ProcessKeyDownload", new Gson().toJson(response.body().getData()));
+                            Log.e("ProcessKeyDownload", "isSuccessful" + new Gson().toJson(keyDownloadResponse));
+
+                            String clearTMK = TripleDES.threeDesDecrypt(keyDownloadResponse.masterKey, "11111111111111111111111111111111");
+                            Log.e("Tmk", clearTMK.toString());
+                            Log.e("ClearTmk", keyDownloadResponse.masterKey);
+//                        int retTMK = securityKeyManager.saveTMK("75EEF0E4ECD345089A9E22CA41EFC735", "5451BC0B64F146435BBF320ED579C4AE");
+
+                            String clearTPK = TripleDES.threeDesDecrypt(keyDownloadResponse.pinKey, keyDownloadResponse.masterKey);
+                            Log.e("clearTPK", clearTPK.toString());
+                            mClearTPK = clearTPK.toString();
+//                        int retTPK = securityKeyManager.saveTPK("3773E02C70A7B6C20BCDC7F1FDCECB57");
+
+                            String clearTSK = TripleDES.threeDesDecrypt(keyDownloadResponse.sessionKey, clearTMK);
+                            Log.e("clearTSK", clearTSK.toString());
+
+                            merchantId = keyDownloadResponse.downloadParameter.merchantId;
+                            tsk = keyDownloadResponse.sessionKey;
+                            merchantLoc = keyDownloadResponse.downloadParameter.merchantNameAndLocation;
+                            merchantCategoryCode = keyDownloadResponse.downloadParameter.merchantCategoryCode;
+                            mKeyDownloadResponse = keyDownloadResponse;
+                            terminalId = keyDownloadResponse.terminalId;
+                            mlistener.onSuccess("Terminal Configuration Successful");
+
+                            SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_KEY_CONFIG, true);
+
+                            sendMsg(1202);
+                            Log.e("Okayy", "E reach " + merchantId);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                } else {
+                    try {
+                        Gson gson = new Gson();
+                        Type type = new TypeToken<KeyDownloadResponse>() {
+                        }.getType();
+
+                        keyDownloadResponse = gson.fromJson(response.errorBody().charStream(), type);
+                        Log.e("ProcessTransaction", "ProcessTransaction failed" + new Gson().toJson(keyDownloadResponse));
+                        SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_KEY_CONFIG, false);
+                        mlistener.onFailed("Terminal Configuration Failed");
+
+                    } catch (Exception e) {
+                        Log.e("ProcessKeyDownload", "error" + e.getMessage());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<BaseData<KeyDownloadResponse>> call, @NonNull Throwable t) {
+                SharedPreferencesUtils.getInstance().setValue(Constants.INTENT_KEY_CONFIG, false);
+                mlistener.onFailed("Terminal Configuration Failed");
+
+                KeyDownloadResponse keyDownloadResponse = new KeyDownloadResponse();
+                Log.e("ProcessKeyDownload", "onFailure" + t.getMessage());
+                Log.e("ProcessKeyDownload", "onFailure" + keyDownloadResponse);
+            }
+        });
+    }
+
 
     private void ProcessTransaction(BlusaltTerminalInfo blusaltTerminalInfo) {
         RetrofitClientInstance.getInstance().getDataService().postTransactionToMiddleWare(blusaltTerminalInfo).enqueue(new Callback<BaseData<TerminalResponse>>() {
@@ -2852,7 +3461,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 
     public void apiResponseCall(TerminalResponse terminalResponse) {
         try {
-
+//            onCompleteTransaction(terminalResponse);
             dismissDialog();
             dialog = new Dialog(PosActivity.this);
             dialog.setContentView(R.layout.alert_dialog);
@@ -2890,6 +3499,12 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //            dialog.show();
             amount = "";
             cashbackAmount = "";
+
+            Intent intent = new Intent();
+            String fullPay = new Gson().toJson(terminalResponse);
+            intent.putExtra(getString(R.string.data), fullPay);
+            // prepareForPrinters(PosActivity.this,terminalResponse);
+            finishTransaction(intent);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -2928,11 +3543,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     public TerminalInfo showTerminalEmvTransResult(String _PinBlock, String _responseCode, String deviceMacAddress) {
         TerminalInfo terminalInfo = getDefaultTerminalInfo();
         terminalInfo.fromAccount = "Default";// getAccountTypeString(accountType);
-        terminalInfo.responseCode = _responseCode;
-        terminalInfo.responseDescription = "Data collected successfully";
+//        terminalInfo.responseCode = _responseCode;
+//        terminalInfo.responseDescription = "Data collected successfully";
         terminalInfo.TerminalName = "mpos";
         TlvDataList tlvDataList = null;
-        String tlv = null;
+        String tlv = creditCard.getEmvData().getIccData();
         try {
 //            tlv = DeviceHelper.getEmvHandler().getTlvByTags(EmvUtil.tags);
 //            tlvDataList = TlvDataList.fromBinary(tlv);
@@ -2998,7 +3613,8 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             Log.e("Tag DedicatedFileName", DedicatedFileName.substring(9, DedicatedFileName.length() - 1));
 
             terminalInfo.cardOwner = "CUSTOMER / INSTANT";
-            Log.d(TAG, "ICC Data: " + "\n" + tlv);
+            Log.d(TAG, "myICC Data: " + "\n" + tlv);
+            terminalInfo.iccData = tlv;
             terminalInfo.DedicatedFileName = DedicatedFileName.substring(9, DedicatedFileName.length() - 1);
             terminalInfo.CvmResults = CvmResults.substring(11, CvmResults.length() - 1);
             terminalInfo.ApplicationInterchangeProfile = ApplicationInterchangeProfile.substring(9, ApplicationInterchangeProfile.length() - 1);
@@ -3017,7 +3633,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
             Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
             Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
             Log.e("My track2", strTrack2 + " " + pan + " " + expiry);
-
+            terminalInfo.track2 = strTrack2;
             terminalInfo.pan = pan;
             terminalInfo.expiryYear = expiry.substring(0, 2);
             terminalInfo.expiryMonth = expiry.substring(2);
@@ -3166,6 +3782,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                 Log.e("Log TAG", String.valueOf(R.string.starting));
                 terminalTime = new SimpleDateFormat("yyyyMMddHHmmss").format(Calendar.getInstance().getTime());
 
+                pos.setFormatId(MKSK);
                 if (posType == POS_TYPE.UART) {
                     pos.doTrade(terminalTime, 0, 30);
                 } else {
@@ -3314,6 +3931,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
     }
 
     private int getKeyIndex() {
+        mKeyIndex.setText("");
         String s = mKeyIndex.getText().toString();
         if (TextUtils.isEmpty(s)) {
             return 0;
@@ -3383,11 +4001,11 @@ public class PosActivity extends BaseActivity implements TransactionListener {
                         Hashtable<String, String> h = pos.getNFCBatchData();
                         String tlv = h.get("tlv");
                         TRACE.i("nfc batchdata1: " + tlv);
-                        content = statusEditText.getText().toString() + "\nNFCbatchData: " + h.get("tlv");
+                        Log.e("Log TAG", "\nNFCbatchData: " + h.get("tlv"));
                     } else {
-                        content = statusEditText.getText().toString() + "\nNFCbatchData: " + nfcLog;
+                        Log.e("Log TAG", "\nNFCbatchData: " + nfcLog);
                     }
-                    Log.e("Log TAG", content);
+//                    Log.e("Log TAG", content);
                     break;
                 case 1703:
 //                    int keyIndex = getKeyIndex();
@@ -3409,10 +4027,86 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                    pos.updateWorkKey(digEnvelopStr);
                     break;
 
+                case 1202:
+
+                    if (merchantId != null) {
+                        Log.e("KeyDownlaod", merchantId);
+                        Log.e("KeyDownlaod", tsk);
+                        Log.e("KeyDownlaod", merchantLoc);
+                        Log.e("KeyDownlaod", merchantCategoryCode);
+                        Log.e("KeyDownlaod", terminalId);
+
+                        localData.setMerchantId(merchantId);
+                        localData.setTsk(tsk);
+                        localData.setMerchantLoc(merchantLoc);
+                        localData.setMerchantCategoryCode(merchantCategoryCode);
+                        localData.setTerminalId(terminalId);
+                    }
+
+                    if (appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_INJECTED)
+                            && appPreferenceHelper.getSharedPreferenceString(Constants.KEY_INJECTED_BLUETOOTH).equals(blueTootchAddress)) {
+                        pos_view_update.setText("Insert Card into mPOS");
+
+//                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED, false);
+//                appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, false);
+//                Log.e("TAG Ckkkkk", "isSetMasterKeyResult " + appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED));
+//                Log.e("TAG Ckkkkk", "isUpdateWorkKeyResult " + appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED));
+
+//                if (!appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED)) {
+//                    try {
+//                        injectMasterKeys();
+//                    } catch (CryptoException e) {
+//                        throw new RuntimeException(e);
+//                    }
+//                } else if (!appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED)) {
+//                    injectWorkKeys();
+//                } else {
+                        pos.setFormatId(MKSK);
+                        if (posType == POS_TYPE.UART) {
+                            Log.e("TAG", "dotrade");
+                            pos.doTrade(terminalTime, 0, 60);
+                        } else {
+                            Log.e("TAG", "start do trade");
+//                int keyIdex = getKeyIndex();
+                            pos.doTrade(0, 30);//start do trade
+                        }
+//                }
+
+                    } else {
+                        pos_view_update.setText("Checking mPOS");
+
+                        if (pos == null) {
+                            pos = QPOSService.getInstance(CommunicationMode.BLUETOOTH);
+                            pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
+                            Log.e("TAG open", "updating...");
+                        } else {
+                            pos.updateEMVConfigByXml(new String(FileUtils.readAssetsLine("NIGERIA-QPOS cute,CR100,D20,D30.xml", PosActivity.this)));
+                            Log.e("TAG open", "updating...");
+                        }
+                    }
+
+                    break;
                 case 1203:
 
-                    pos_view_update.setText("Insert Card to mPOS");
+//                    appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED, false);
+//                    appPreferenceHelper.setSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED, false);
+//
+//                    Log.e("TAG Ckkkkk 2", "isSetMasterKeyResult " + appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED));
+//                    Log.e("TAG Ckkkkk 2", "isUpdateWorkKeyResult " + appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED));
 
+//                    if (!appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_MASTER_INJECTED)) {
+//                        Log.e("TAG", "About to Inject Master Key");
+//                        try {
+//                            injectMasterKeys();
+//                        } catch (CryptoException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//                    } else if (!appPreferenceHelper.getSharedPreferenceBoolean(Constants.IS_KEY_WORK_INJECTED)) {
+//                        Log.e("TAG", "About to Inject Work Key");
+//                        injectWorkKeys();
+//                    } else {
+                    pos_view_update.setText("Insert Card to mPOS");
+                    pos.setFormatId(MKSK);
                     if (posType == POS_TYPE.UART) {
                         Log.e("TAG", "dotrade");
                         pos.doTrade(terminalTime, 0, 60);
@@ -3421,6 +4115,7 @@ public class PosActivity extends BaseActivity implements TransactionListener {
 //                int keyIdex = getKeyIndex();
                         pos.doTrade(0, 30);//start do trade
                     }
+//                    }
                     break;
                 default:
                     break;

@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.Keep;
 
+import com.dspread.demoui.Pos;
 import com.dspread.demoui.blusaltmpos.MyApplication;
 
 import java.util.Arrays;
@@ -26,7 +27,7 @@ public class SharedPreferencesUtils {
 
     public static synchronized SharedPreferencesUtils getInstance() {
         if (mSharedPreferencesUtils == null) {
-            mSharedPreferencesUtils = new SharedPreferencesUtils(MyApplication.getINSTANCE());
+            mSharedPreferencesUtils = new SharedPreferencesUtils(Pos.mContext);
         }
         return mSharedPreferencesUtils;
     }
